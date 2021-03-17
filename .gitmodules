@@ -1,0 +1,6 @@
+[submodule "kvmpp"]
+	path = kvmpp
+	url = https://github.com/tomwimmenhove/kvmpp/
+[submodule "rpcbuf"]
+	path = rpcbuf
+	url = https://github.com/tomwimmenhove/rpcbuf
