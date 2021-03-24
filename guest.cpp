@@ -117,7 +117,7 @@ public:
 		st.puts("\"\n");
 	}
 
-	char c = 'A';
+	char c = 'D';
 };
 
 int main();
@@ -164,10 +164,11 @@ void __attribute__((noreturn)) __attribute__((section(".start"))) _start(void)
 	cw &= ~(1 << 2);    // Set ZM bit: generate div-by-zero exceptions
 	fpu::fldcw(cw);
 
-	a.bla();
 
+	a.bla();
 	custom_preinit();
 	custom_init();
+	a.bla();
 
 	int exit_code = main();
 
@@ -180,24 +181,13 @@ int main()
 {
 	sender_test st(d);
 
-	//st.foo(0, 1, 2);
-	//int x = st.foo(1, 2, 3);
-	//st.bar();
+	st.puts((char*) "_code_end: ");
+	st.pxint((uint64_t) &_code_end);
+	st.putc('\n');
 
-	st.puts((char*) "Motherfucker XXX\n");
+	st.puts((char*) "_data_end: ");
+	st.pxint((uint64_t) &_data_end);
+	st.putc('\n');
 
-/*	func_ptr* func = _init_array_start;
-	for (int i = 0; i < 3; i++)
-	{
-		dint((uint64_t) *func);
-		//dint(*((uint64_t*) ((uint64_t) func)));
-		func++;
-	}
-*/
-
-	//uint64_t a = (uint64_t) &abla;
-	uint64_t a = 0;//(uint64_t) &_init_array_start;
-	return (int) a;
-
-	//return *(uint64_t*) 0xda8;
+	return 42;
 }

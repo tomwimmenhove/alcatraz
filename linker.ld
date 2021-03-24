@@ -89,6 +89,5 @@ SECTIONS
 	.bss : { *(.bss) }
 
 	. = ALIGN(0x1000); 
-	. = ALIGN(0x100000); 
 	_data_end = .;
 }

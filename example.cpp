@@ -27,17 +27,17 @@ static void setup_64bit_code_segment(struct kvm_sregs *sregs)
 	sregs->ds = sregs->es = sregs->fs = sregs->gs = sregs->ss = seg;
 }
 
-static void setup_long_mode(void *mem_p, struct kvm_sregs *sregs)
+static size_t setup_long_mode(void *mem_p, size_t mem_size, struct kvm_sregs *sregs)
 {   
 	char* mem = (char*) mem_p;
 
-	uint64_t pml4_addr = 0x2000;
+	uint64_t pml4_addr = mem_size - 0x1000;
 	uint64_t *pml4 = (uint64_t *)(mem + pml4_addr);
 
-	uint64_t pdpt_addr = 0x3000;
+	uint64_t pdpt_addr = mem_size - 0x2000;
 	uint64_t *pdpt = (uint64_t *)(mem + pdpt_addr);
 
-	uint64_t pd_addr = 0x4000;
+	uint64_t pd_addr = mem_size - 0x3000;
 	uint64_t *pd = (uint64_t *)(mem + pd_addr);
 
 	pml4[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pdpt_addr;
@@ -58,6 +58,8 @@ static void setup_long_mode(void *mem_p, struct kvm_sregs *sregs)
 	sregs->efer = EFER_LME | EFER_LMA;
 
 	setup_64bit_code_segment(sregs);
+
+	return 0x3000;
 }
 
 #include "rpcbuf/src/rpcbuf.h"
@@ -146,7 +148,7 @@ int main()
 	/* Setup the special registers */
 	struct kvm_sregs sregs;
 	vcpu->get_sregs(sregs);
-	setup_long_mode(mem, &sregs);
+	size_t pg_table_size = setup_long_mode(mem, mem_size, &sregs);
 	vcpu->set_sregs(sregs);
 
 	/* Set up the general registers */
@@ -156,7 +158,7 @@ int main()
 	regs.rflags = 2;
 	regs.rip = 0x0000;
 	/* Create stack at top of 2 MB page and grow down. */
-	regs.rsp = (2 << 20) - 128000;
+	regs.rsp = (2 << 20) - pg_table_size;
 	vcpu->set_regs(regs);
 
 
