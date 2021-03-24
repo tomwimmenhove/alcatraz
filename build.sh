@@ -1,24 +1,31 @@
 #!/bin/bash
 
-#cc -Wall -Wextra -Werror -O2 -m64 -ffreestanding -fno-pic -c -o guest64.o guest.c
-
+#if 1
 CRTBEGIN_OBJ=`g++ -print-file-name=crtbegin.o`
 CRTEND_OBJ=`g++ -print-file-name=crtend.o`
+#else
+CRTBEGIN_OBJ=crt/crtbegin.o
+CRTEND_OBJ=crt/crtend.o
+#endif
 
-as crti.s -o crti.o
-as crtn.s -o crtn.o
-#g++ -std=c++17 -nostdlib -Wall -Wextra -Werror -O2 -m64 -ffreestanding -nostdlib -fno-pic -c -o guest64_main.o guest.cpp || exit
-#g++ crti.o $CRTBEGIN_OBJ guest64_main.o $CRTEND_OBJ crtn.o -o guest64.o -nostdlib #-lgcc
+# Compile the startup and guest code
 
-g++ -std=c++17 -nostdlib -Wall -Wextra -Werror -O2 -m64 -ffreestanding -nostdlib -fno-pic -c -o guest64.o guest.cpp || exit
-#ld -T linker.ld crti.o $CRTBEGIN_OBJ guest64.o $CRTEND_OBJ crtn.o -o guest64.img
+gcc  -c crti.S -o crti.o
+gcc  -c crtn.S -o crtn.o
 
-ld -T linker.ld crti.o /home/tom/grive-Tom.Wimmenhove/Projects/toyos/cross/lib/gcc/x86_64-elf/7.1.0/crtbegin.o /home/tom/grive-Tom.Wimmenhove/Projects/toyos/cross/lib/gcc/x86_64-elf/7.1.0/crtend.o crtn.o guest64.o -o guest64.elf
+g++ -std=c++17 -fno-threadsafe-statics  -ggdb -DDEBUG -fstack-protector-all -O2  -nostdlib -ffreestanding -lgcc -mcmodel=kernel -fno-pic -ffunction-sections -fdata-sections -Wl,gc-sections -fno-exceptions -fno-rtti -c -o guest64.o guest.cpp || exit
 
+g++ -std=c++17 -fno-threadsafe-statics  -ggdb -DDEBUG -fstack-protector-all -O2  -nostdlib -ffreestanding -lgcc -mcmodel=kernel -fno-pic -ffunction-sections -fdata-sections -Wl,gc-sections -fno-exceptions -fno-rtti -c -o klib.o klib.cpp || exit
+
+# Compile into an elf (easier for disassembly and debugging */
+ld -T linker.ld crti.o $CRTBEGIN_OBJ guest64.o klib.o $CRTEND_OBJ crtn.o -o guest64.elf
+
+# Create a raw binary
 objcopy -O binary guest64.elf guest64.img
 
+# Create a payload with the binary in it
 ld -b binary -r guest64.img -o guest64.img.o
-
 ld -T payload.ld -o payload.o
 
+# Finally, compile the application
 g++ -std=c++17 -o example payload.o example.cpp kvmpp/src/kvmpp.cpp  && ./example 

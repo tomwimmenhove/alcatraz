@@ -1,5 +1,6 @@
 #include <string.h>
 #include <iostream>
+#include <iomanip>
 #include <sys/mman.h>
 
 #include "kvmpp/src/kvmpp.h"
@@ -78,10 +79,42 @@ private:
 	void bar() { std::cout << "Hello world\n"; }
 	void putc(char c) { std::cout << c; }
 	void puts(const char* s) { std::cout << (&(((char*) mem)[(intptr_t) s])); }
+	void dint(uint64_t x) { std::cout << "Debug int: " << std::dec << x << " (0x" << std::hex << x << ")\n"; }
+	void pxint(uint64_t x) { std::cout << std::hex << x; }
+	void pdint(uint64_t x) { std::cout << std::dec << x; }
 
 	void* mem;
 };
 
+void print_reg(std::string name, uint64_t value)
+{
+	std::cout << name << ": 0x" << std::hex << std::setfill('0') << std::setw(16) << value << " (" << std::dec << value << ")\n";
+}
+
+void print_regs(kvm_regs& regs)
+{
+	print_reg("rax", regs.rax);
+	print_reg("rbx", regs.rbx);
+	print_reg("rcx", regs.rcx);
+	print_reg("rdx", regs.rdx);
+
+	print_reg("rdi", regs.rdi);
+	print_reg("rsi", regs.rsi);
+	print_reg("rsp", regs.rsp);
+	print_reg("rbp", regs.rbp);
+
+	print_reg(" r8", regs.r8);
+	print_reg(" r9", regs.r9);
+	print_reg("r10", regs.r10);
+	print_reg("r11", regs.r11);
+	print_reg("r12", regs.r12);
+	print_reg("r13", regs.r13);
+	print_reg("r14", regs.r14);
+	print_reg("r15", regs.r15);
+
+	print_reg("rip", regs.rip);
+	print_reg("rflags", regs.rflags);
+}
 
 int main()
 {
@@ -99,6 +132,7 @@ int main()
 	{
 		throw std::system_error(errno, std::generic_category());
 	}
+	memset(mem, 0, mem_size);
 
 	madvise(mem, mem_size, MADV_MERGEABLE);
 
@@ -120,9 +154,9 @@ int main()
 	memset(&regs, 0, sizeof(regs));
 	/* Clear all FLAGS bits, except bit 1 which is always set. */
 	regs.rflags = 2;
-	regs.rip = 0x1000;
+	regs.rip = 0x0000;
 	/* Create stack at top of 2 MB page and grow down. */
-	regs.rsp = 2 << 20;
+	regs.rsp = (2 << 20) - 128000;
 	vcpu->set_regs(regs);
 
 
@@ -142,7 +176,9 @@ int main()
 		{
 			case KVM_EXIT_HLT:
 			{
-				std::cout << "Result: " << vcpu->get_regs().rax << '\n';
+				kvm_regs regs;
+				vcpu->get_regs(regs);
+				std::cout << "Result: " << std::dec << regs.rax << " (" << std::hex << regs.rax << "), rip=" << ((void*) regs.rip)<< '\n';
 
 				exit = 1;
 				break;
@@ -151,9 +187,24 @@ int main()
 			case KVM_EXIT_IO:
 			{
 				if (run->io.direction == KVM_EXIT_IO_OUT
-						&& run->io.port == 0x4242 && run->io.size == sizeof(uint32_t))
+						&& run->io.port == 0x42)// && run->io.size == sizeof(uint32_t))
 				{
-					uint32_t id = *(uint32_t*) ((uintptr_t) run + run->io.data_offset);
+					//uint32_t id = *(uint32_t*) ((uintptr_t) run + run->io.data_offset);
+					uint32_t id;
+					switch (run->io.size)
+					{
+						case sizeof(uint32_t):
+							id = *(uint32_t*) ((uintptr_t) run + run->io.data_offset);
+							break;
+						case sizeof(uint16_t):
+							id = *(uint16_t*) ((uintptr_t) run + run->io.data_offset);
+							break;
+						case sizeof(uint8_t):
+							id = *(uint8_t*) ((uintptr_t) run + run->io.data_offset);
+							break;
+					}
+
+					//std::cout << "IO id " << id <<  " @" << run->io.data_offset << '\n';
 
 					kvm_regs regs;
 					vcpu->get_regs(regs);
@@ -168,13 +219,29 @@ int main()
 
 					rt.exec(id, data, vm_mem_space);
 				}
+				else
+				{
+					std::cout << "Unknown IO error. Port=" << run->io.port << ", size=" << (run->io.size * 8) << "bits, direction:" << (run->io.direction == KVM_EXIT_IO_OUT ? "out" : "in") << '\n';
+					break;
+				}
 				break;
 			}
 
 			default:
 			{
 				exit = 1;
-				std::cout << "VCPU exited with reason: " << run->exit_reason << '\n';
+				auto regs = vcpu->get_regs();
+				std::cout << "VCPU exited with reason: " << run->exit_reason << ", rip=" << ((void*) regs.rip)<< '\n';
+
+				unsigned char* ripdat = (unsigned char*) mem + regs.rip;
+				std::cout << "Data at rip: ";
+				for (int i = 0; i < 15; i++)
+				{
+					std::cout << std::hex << std::setfill('0') << std::setw(2) << ((int) ripdat[i]) << ' ';
+				}
+				std::cout << '\n';
+
+				print_regs(regs);
 				break;
 			}
 		}

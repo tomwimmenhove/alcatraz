@@ -47,13 +47,21 @@ public:
 protected:
 	void exec(size_t id, void* mem, size_t, size_t)
 	{
-		uint16_t port = 0x4242;
+#if 1
+		uint16_t port = 0x42;
 
 		asm("mov %0, %%rdi\n"
 			"outl %1, %2"
 			: /* empty */
 			: "r" (mem), "a" ((uint32_t) id), "Nd" (port)
 			: "memory", "rdi");
+#else
+		asm("mov %0, %%rdi\n"
+			"outw %1, $0x42"
+			: /* empty */
+			: "r" (mem), "a" ((uint16_t) id)
+			: "memory", "rdi");
+#endif
 	}
 };
 
@@ -78,24 +86,75 @@ extern "C"
 {
 	void _init();
 	void _fini();
+	
+	int __cxa_atexit(void (*f)(void*), void *objptr, void *dso);
+
+//	void frame_dummy();
+//	void __do_global_ctors_aux();
 
 	void _start();
 }
 
-class A
+class A_CLASS_WITH_A_CONSTRUCTOR
 {
 public:
-	A()
+	A_CLASS_WITH_A_CONSTRUCTOR(int)
 	{
 		dispatcher d;
 		sender_test st(d);
 		st.puts((char*) "Constructive motherfucker\n");
+//		st.putc(c);
+//		st.putc('\n');
+//		c = 'B';
 	}
+
+	void bla()
+	{
+		dispatcher d;
+		sender_test st(d);
+		st.puts((char*) "bla2: \"");
+		st.putc(c);
+		st.puts("\"\n");
+	}
+
+	char c = 'A';
 };
 
 int main();
 
-static A a;
+extern uint64_t init_array;
+
+static A_CLASS_WITH_A_CONSTRUCTOR a(42);
+
+volatile static int abla = 42;
+
+extern void* _data_end;
+extern void* _code_end;
+
+typedef void (*func_ptr)(void);
+
+extern func_ptr __preinit_array_start[0], __preinit_array_end[0];
+extern func_ptr __init_array_start[0], __init_array_end[0];
+extern func_ptr __fini_array_start[0], __fini_array_end[0];
+
+static void init_range(func_ptr* start, func_ptr* end)
+{
+	for ( func_ptr* func = start; func != end; func++ )
+	{
+		(*func)();
+	}
+}
+
+static void custom_preinit(void) { init_range(__preinit_array_start, __preinit_array_end); }
+static void custom_init(void) { init_range(__init_array_start, __init_array_end); }
+static void custom_fini(void) { init_range(__fini_array_start, __fini_array_end); }
+ 
+void dint(uint64_t x)
+{
+	dispatcher d;
+	sender_test st(d);
+	st.dint(x);
+}
 
 void __attribute__((noreturn)) __attribute__((section(".start"))) _start(void)
 {
@@ -105,27 +164,40 @@ void __attribute__((noreturn)) __attribute__((section(".start"))) _start(void)
 	cw &= ~(1 << 2);    // Set ZM bit: generate div-by-zero exceptions
 	fpu::fldcw(cw);
 
-//	_init();
+	a.bla();
+
+	custom_preinit();
+	custom_init();
 
 	int exit_code = main();
-
-//	_fini();
 
 	for (;;)
 		asm("hlt" : /* empty */ : "a" (exit_code) : "memory");
 }
 
+	dispatcher d;
 int main()
 {
-	dispatcher d;
-
 	sender_test st(d);
 
-	st.foo(0, 1, 2);
-	int x = st.foo(1, 2, 3);
-	st.bar();
+	//st.foo(0, 1, 2);
+	//int x = st.foo(1, 2, 3);
+	//st.bar();
 
-	st.puts((char*) "Motherfucker\n");
+	st.puts((char*) "Motherfucker XXX\n");
 
-	return x;
+/*	func_ptr* func = _init_array_start;
+	for (int i = 0; i < 3; i++)
+	{
+		dint((uint64_t) *func);
+		//dint(*((uint64_t*) ((uint64_t) func)));
+		func++;
+	}
+*/
+
+	//uint64_t a = (uint64_t) &abla;
+	uint64_t a = 0;//(uint64_t) &_init_array_start;
+	return (int) a;
+
+	//return *(uint64_t*) 0xda8;
 }
