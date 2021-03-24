@@ -6,10 +6,12 @@
 #include "kvmpp/src/kvmpp.h"
 #include "kvmpp/example/cpudefs.h"
 
+const uint64_t virtual_offset = 2048 * 1024; // Virtual memory starts at 2MB */
+
 static void setup_64bit_code_segment(struct kvm_sregs *sregs)
 {
 	struct kvm_segment seg;
-	seg.base = 2 << 20;
+	seg.base = virtual_offset;
 	seg.limit = 0xffffffff;
 	seg.selector = 1 << 3;
 	seg.present = 1;
@@ -119,6 +121,39 @@ void print_regs(kvm_regs& regs)
 	print_reg("rflags", regs.rflags);
 }
 
+class mem_convert
+{
+public:
+	mem_convert(void* mem, size_t mem_size, intptr_t base_offset)
+		: mem((uint64_t) mem), mem_size(mem_size), base_offset(base_offset)
+	{ }
+
+	intptr_t space_at(uint64_t address)
+	{
+		return mem_size - address + base_offset;
+	}
+
+	template<typename T>
+	T data_ptr_at(uint64_t address)
+	{
+		return (T) (address - base_offset + mem);
+	}
+
+private:
+	uint64_t mem;
+	size_t mem_size;
+	intptr_t base_offset;
+};
+
+class kvm_converter
+{
+	template<typename T>
+	static T read_kvm_run(struct kvm_run* run, uint64_t offset)
+	{
+		return *(T*) ((uintptr_t) run + run->io.data_offset);
+	}
+};
+
 int main()
 {
 	/* Get the KVM instance */
@@ -157,11 +192,10 @@ int main()
 	memset(&regs, 0, sizeof(regs));
 	/* Clear all FLAGS bits, except bit 1 which is always set. */
 	regs.rflags = 2;
-	regs.rip = 1024 * 2048;
+	regs.rip = virtual_offset; // Execution starts directly at the start of the virtual memmory
 
-	/* Create stack at top of 2 MB page and grow down. */
-	//regs.rsp = 1024 * 2048 + 32;// * 2048 + 4096;//(2 << 20) - pg_table_size;
-	regs.rsp = 1024 * 2048 * 2 - pg_table_size;//4096;//(2 << 20) - pg_table_size;
+	/* Create stack right below the page tables and grow down. */
+	regs.rsp = virtual_offset + mem_size - pg_table_size;
 	vcpu->set_regs(regs);
 
 
@@ -170,6 +204,8 @@ int main()
 	memcpy(mem, guest64, guest64_end-guest64);
 
 	receiver_test rt(mem);
+
+	mem_convert converter(mem, mem_size, 1024 * 2048);
 
 	/* Run the CPU */
 	for (;;)
@@ -195,34 +231,21 @@ int main()
 						&& run->io.port == 0x42)// && run->io.size == sizeof(uint32_t))
 				{
 					//uint32_t id = *(uint32_t*) ((uintptr_t) run + run->io.data_offset);
-					uint32_t id;
-					switch (run->io.size)
-					{
-						case sizeof(uint32_t):
-							id = *(uint32_t*) ((uintptr_t) run + run->io.data_offset);
-							break;
-						case sizeof(uint16_t):
-							id = *(uint16_t*) ((uintptr_t) run + run->io.data_offset);
-							break;
-						case sizeof(uint8_t):
-							id = *(uint8_t*) ((uintptr_t) run + run->io.data_offset);
-							break;
-					}
-
+					uint32_t id = vcpu->read_io_from_run();
 					//std::cout << "IO id " << id <<  " @" << run->io.data_offset << '\n';
 
 					kvm_regs regs;
 					vcpu->get_regs(regs);
 
-					if (regs.rdi - (2 << 20) > mem_size)
+					intptr_t space = converter.space_at(regs.rdi);
+					if (space < 0)
 					{
 						throw std::overflow_error("VM tried tried to access out-of-bound memory");
 					}
 
-					void* data = (void*) ((uint64_t) regs.rdi - (2 << 20) + (uint64_t) mem);
-					size_t vm_mem_space = mem_size - regs.rdi;
+					void* data = converter.data_ptr_at<void*>(regs.rdi);
 
-					rt.exec(id, data, vm_mem_space);
+					rt.exec(id, data, space);
 				}
 				else
 				{
