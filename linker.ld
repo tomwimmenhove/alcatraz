@@ -4,7 +4,6 @@ ENTRY(_start)
 
 SECTIONS
 {
-/*	. = 0xffffffff80000000; */
 	. = 0x0000000000200000;
 	.start : { *(.start) }
 	.text : { *(.text*) }
@@ -43,6 +42,9 @@ SECTIONS
 		*(.dtors)
 	}
 
+	/* For some reason _init that GCC adds doesn't fucking work, so we're
+	 * generating symbols so that we can manually run all the global 
+	 * constructors */
 	.preinit_array     :
 	{
 		PROVIDE_HIDDEN (__preinit_array_start = .);
@@ -66,24 +68,6 @@ SECTIONS
 		PROVIDE_HIDDEN (__fini_array_end = .);
 	}
 	
-	/* Include the list of initialization functions sorted. */
-	/*.init_array :
-	{
-		crti.o(.init_array)
-		KEEP (*(SORT(EXCLUDE_FILE(crti.o crtn.o) .init_array.*)))
-		KEEP (*(EXCLUDE_FILE(crti.o crtn.o) .init_array))
-		crtn.o(.init_array)
-	}*/
-
-	/* Include the list of termination functions sorted. */
-	/*.fini_array :
-	{
-		crti.o(.fini_array)
-		KEEP (*(SORT(EXCLUDE_FILE(crti.o crtn.o) .fini_array.*)))
-		KEEP (*(EXCLUDE_FILE(crti.o crtn.o) .fini_array))
-		crtn.o(.fini_array)
-	}*/
-
 	_code_end = .;
 	. = ALIGN(0x1000); 
 	.bss : { *(.bss) }

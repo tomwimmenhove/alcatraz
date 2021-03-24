@@ -145,15 +145,6 @@ private:
 	intptr_t base_offset;
 };
 
-class kvm_converter
-{
-	template<typename T>
-	static T read_kvm_run(struct kvm_run* run, uint64_t offset)
-	{
-		return *(T*) ((uintptr_t) run + run->io.data_offset);
-	}
-};
-
 int main()
 {
 	/* Get the KVM instance */
@@ -198,14 +189,13 @@ int main()
 	regs.rsp = virtual_offset + mem_size - pg_table_size;
 	vcpu->set_regs(regs);
 
-
 	/* Copy the guest code */
 	extern const unsigned char guest64[], guest64_end[];
 	memcpy(mem, guest64, guest64_end-guest64);
 
 	receiver_test rt(mem);
 
-	mem_convert converter(mem, mem_size, 1024 * 2048);
+	mem_convert converter(mem, mem_size, virtual_offset);
 
 	/* Run the CPU */
 	for (;;)
@@ -219,7 +209,9 @@ int main()
 			{
 				kvm_regs regs;
 				vcpu->get_regs(regs);
-				std::cout << "Result: " << std::dec << regs.rax << " (" << std::hex << regs.rax << "), rip=" << ((void*) regs.rip)<< '\n';
+				std::cout << "Result: " << std::dec << regs.rax
+					      << " (" << std::hex << regs.rax
+						  << "), rip=" << ((void*) regs.rip)<< '\n';
 
 				exit = 1;
 				break;
@@ -228,11 +220,9 @@ int main()
 			case KVM_EXIT_IO:
 			{
 				if (run->io.direction == KVM_EXIT_IO_OUT
-						&& run->io.port == 0x42)// && run->io.size == sizeof(uint32_t))
+						&& run->io.port == 0x42)
 				{
-					//uint32_t id = *(uint32_t*) ((uintptr_t) run + run->io.data_offset);
 					uint32_t id = vcpu->read_io_from_run();
-					//std::cout << "IO id " << id <<  " @" << run->io.data_offset << '\n';
 
 					kvm_regs regs;
 					vcpu->get_regs(regs);
@@ -249,7 +239,14 @@ int main()
 				}
 				else
 				{
-					std::cout << "Unknown IO error. Port=" << run->io.port << ", size=" << (run->io.size * 8) << "bits, direction:" << (run->io.direction == KVM_EXIT_IO_OUT ? "out" : "in") << '\n';
+					std::cout << "Unknown IO error. Port=" << run->io.port
+						      << ", size=" << (run->io.size * 8)
+							  << "bits, direction:" << (run->io.direction == KVM_EXIT_IO_OUT
+									  ? "out"
+									  : "in")
+							  << '\n';
+
+					exit = 1;
 					break;
 				}
 				break;
@@ -259,7 +256,8 @@ int main()
 			{
 				exit = 1;
 				auto regs = vcpu->get_regs();
-				std::cout << "VCPU exited with reason: " << run->exit_reason << ", rip=" << ((void*) regs.rip)<< '\n';
+				std::cout << "VCPU exited with reason: " << run->exit_reason
+					      << ", rip=" << ((void*) regs.rip)<< '\n';
 
 				unsigned char* ripdat = (unsigned char*) mem + regs.rip;
 				std::cout << "Data at rip: ";
