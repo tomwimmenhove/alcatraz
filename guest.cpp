@@ -149,13 +149,6 @@ static void custom_preinit(void) { init_range(__preinit_array_start, __preinit_a
 static void custom_init(void) { init_range(__init_array_start, __init_array_end); }
 static void custom_fini(void) { init_range(__fini_array_start, __fini_array_end); }
  
-void dint(uint64_t x)
-{
-	dispatcher d;
-	sender_test st(d);
-	st.dint(x);
-}
-
 void __attribute__((noreturn)) __attribute__((section(".start"))) _start(void)
 {
 	fpu::fninit();
@@ -164,23 +157,22 @@ void __attribute__((noreturn)) __attribute__((section(".start"))) _start(void)
 	cw &= ~(1 << 2);    // Set ZM bit: generate div-by-zero exceptions
 	fpu::fldcw(cw);
 
-
-	a.bla();
 	custom_preinit();
 	custom_init();
-	a.bla();
 
 	int exit_code = main();
+
+	custom_fini();
 
 	for (;;)
 		asm("hlt" : /* empty */ : "a" (exit_code) : "memory");
 }
 
-	dispatcher d;
+dispatcher d;
+sender_test st(d);
+
 int main()
 {
-	sender_test st(d);
-
 	st.puts((char*) "_code_end: ");
 	st.pxint((uint64_t) &_code_end);
 	st.putc('\n');

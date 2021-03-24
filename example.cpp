@@ -9,7 +9,7 @@
 static void setup_64bit_code_segment(struct kvm_sregs *sregs)
 {
 	struct kvm_segment seg;
-	seg.base = 0;
+	seg.base = 2 << 20;
 	seg.limit = 0xffffffff;
 	seg.selector = 1 << 3;
 	seg.present = 1;
@@ -42,7 +42,8 @@ static size_t setup_long_mode(void *mem_p, size_t mem_size, struct kvm_sregs *sr
 
 	pml4[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pdpt_addr;
 	pdpt[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pd_addr;
-	pd[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | PDE64_PS;
+	pd[0] = 0;//PDE64_PRESENT | PDE64_RW | PDE64_USER | PDE64_PS;
+	pd[1] = PDE64_PRESENT | PDE64_RW | PDE64_USER | PDE64_PS;
 
 	sregs->cr3 = pml4_addr;
 	sregs->cr4
@@ -80,7 +81,7 @@ private:
 	int foo2(int x, float y, double z) { return (int) (x + y + z); }
 	void bar() { std::cout << "Hello world\n"; }
 	void putc(char c) { std::cout << c; }
-	void puts(const char* s) { std::cout << (&(((char*) mem)[(intptr_t) s])); }
+	void puts(const char* s) { std::cout << (&(((char*) mem)[(intptr_t) s - (2 << 20)])); }
 	void dint(uint64_t x) { std::cout << "Debug int: " << std::dec << x << " (0x" << std::hex << x << ")\n"; }
 	void pxint(uint64_t x) { std::cout << std::hex << x; }
 	void pdint(uint64_t x) { std::cout << std::dec << x; }
@@ -156,15 +157,17 @@ int main()
 	memset(&regs, 0, sizeof(regs));
 	/* Clear all FLAGS bits, except bit 1 which is always set. */
 	regs.rflags = 2;
-	regs.rip = 0x0000;
+	regs.rip = 1024 * 2048;
+
 	/* Create stack at top of 2 MB page and grow down. */
-	regs.rsp = (2 << 20) - pg_table_size;
+	//regs.rsp = 1024 * 2048 + 32;// * 2048 + 4096;//(2 << 20) - pg_table_size;
+	regs.rsp = 1024 * 2048 * 2 - pg_table_size;//4096;//(2 << 20) - pg_table_size;
 	vcpu->set_regs(regs);
 
 
 	/* Copy the guest code */
 	extern const unsigned char guest64[], guest64_end[];
-	memcpy(&(((char*)mem)[regs.rip]), guest64, guest64_end-guest64);
+	memcpy(mem, guest64, guest64_end-guest64);
 
 	receiver_test rt(mem);
 
@@ -211,12 +214,12 @@ int main()
 					kvm_regs regs;
 					vcpu->get_regs(regs);
 
-					if (regs.rdi > mem_size)
+					if (regs.rdi - (2 << 20) > mem_size)
 					{
 						throw std::overflow_error("VM tried tried to access out-of-bound memory");
 					}
 
-					void* data = (void*) ((uint64_t) regs.rdi + (uint64_t) mem);
+					void* data = (void*) ((uint64_t) regs.rdi - (2 << 20) + (uint64_t) mem);
 					size_t vm_mem_space = mem_size - regs.rdi;
 
 					rt.exec(id, data, vm_mem_space);
