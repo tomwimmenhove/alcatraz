@@ -173,13 +173,36 @@ sender_test st(d);
 
 int main()
 {
-	st.puts((char*) "_code_end: ");
+	st.puts("_code_end: ");
 	st.pxint((uint64_t) &_code_end);
 	st.putc('\n');
 
-	st.puts((char*) "_data_end: ");
+	st.puts("_data_end: ");
 	st.pxint((uint64_t) &_data_end);
 	st.putc('\n');
+
+	/* Crude memcheck */
+	uint64_t rsp;
+	asm("mov %%rsp, %0"
+			: "=r" (rsp)
+			:
+			:
+	   );
+
+	for (uint64_t i = (uint64_t) &_data_end + 128; i < rsp - 128; i += sizeof(uint64_t))
+	{
+		*((uint64_t*) i) = i * 3;
+	}
+	for (uint64_t i = (uint64_t) &_data_end + 128; i < rsp - 128; i += sizeof(uint64_t))
+	{
+		if (*((uint64_t*) i) != (uint64_t) ( i * 3))
+		{
+			st.puts("It's fucked\n");
+			return -1;
+		}
+	}
+
+//	*(int*) (2048 * 1024 * 2 + 4096 * 3 - 4) = 42;
 
 	return 42;
 }

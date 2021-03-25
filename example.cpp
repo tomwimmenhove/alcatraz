@@ -7,6 +7,7 @@
 #include "kvmpp/example/cpudefs.h"
 
 const uint64_t virtual_offset = 2048 * 1024; // Virtual memory starts at 2MB */
+const size_t mem_size = 2048 * 1024;
 
 static void setup_64bit_code_segment(struct kvm_sregs *sregs)
 {
@@ -29,18 +30,18 @@ static void setup_64bit_code_segment(struct kvm_sregs *sregs)
 	sregs->ds = sregs->es = sregs->fs = sregs->gs = sregs->ss = seg;
 }
 
-static size_t setup_long_mode(void *mem_p, size_t mem_size, struct kvm_sregs *sregs)
+static size_t setup_long_mode(void *page_mem_p, struct kvm_sregs *sregs)
 {   
-	char* mem = (char*) mem_p;
+	char* mem = (char*) page_mem_p;
 
-	uint64_t pml4_addr = mem_size - 0x1000;
-	uint64_t *pml4 = (uint64_t *)(mem + pml4_addr);
+	uint64_t pml4_addr = mem_size;
+	uint64_t *pml4 = (uint64_t *)(mem);
 
-	uint64_t pdpt_addr = mem_size - 0x2000;
-	uint64_t *pdpt = (uint64_t *)(mem + pdpt_addr);
+	uint64_t pdpt_addr = mem_size + 0x1000;
+	uint64_t *pdpt = (uint64_t *)(mem + 0x1000);
 
-	uint64_t pd_addr = mem_size - 0x3000;
-	uint64_t *pd = (uint64_t *)(mem + pd_addr);
+	uint64_t pd_addr = mem_size + 0x2000;
+	uint64_t *pd = (uint64_t *)(mem + 0x2000);
 
 	pml4[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pdpt_addr;
 	pdpt[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pd_addr;
@@ -154,7 +155,6 @@ int main()
 	auto machine = kvm->create_vm();
 
 	/* Allocate memory for the machine */
-	size_t mem_size = 2048 * 1024;
 	void* mem = mmap(NULL, mem_size, PROT_READ | PROT_WRITE,
 			MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
 	if (mem == MAP_FAILED)
@@ -168,6 +168,12 @@ int main()
 	/* Stick it in slot 0 */
 	machine->set_user_memory_region(0, 0, 0, mem_size, mem);
 
+	size_t page_mem_size = 4096 * 3;
+	void* page_mem = mmap(NULL, page_mem_size, PROT_READ | PROT_WRITE,
+			MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+
+	machine->set_user_memory_region(1, 0, mem_size, page_mem_size, page_mem);
+
 
 	/* Create a virtual CPU instance on the virtual machine */
 	auto vcpu = machine->create_vcpu();
@@ -175,7 +181,7 @@ int main()
 	/* Setup the special registers */
 	struct kvm_sregs sregs;
 	vcpu->get_sregs(sregs);
-	size_t pg_table_size = setup_long_mode(mem, mem_size, &sregs);
+	size_t pg_table_size = setup_long_mode(page_mem, &sregs);
 	vcpu->set_sregs(sregs);
 
 	/* Set up the general registers */
