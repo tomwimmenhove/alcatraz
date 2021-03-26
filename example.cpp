@@ -6,6 +6,8 @@
 
 #include "alcatraz.h"
 
+#include "input_data.h"
+
 class receiver_test : public call_receiver
 {
 #include "call_declarations.h"
@@ -38,7 +40,11 @@ int main()
 
 	a.set_receiver(std::move(rt));
 
-	a.run();
+	input_data args;
+	args.a = 42;
+	args.b = 43;
+
+	a.run(&args, sizeof(input_data));
 
 	return 0;
 }

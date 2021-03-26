@@ -13,7 +13,7 @@ public:
 	void set_receiver(std::unique_ptr<call_receiver>&& receiver);
 	void* get_mem();
 
-	int run();
+	int run(void* data = nullptr, size_t data_len = 0);
 
 	virtual ~alcatraz();
 

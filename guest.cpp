@@ -3,6 +3,8 @@
 
 #include <memory>
 
+#include "input_data.h"
+
 static uint64_t new_p = 1024 * 1024;
 
 void *operator new(size_t size)
@@ -120,7 +122,7 @@ public:
 	char c = 'D';
 };
 
-int main();
+int main(void* data);
 
 extern uint64_t init_array;
 
@@ -149,8 +151,14 @@ static void custom_preinit(void) { init_range(__preinit_array_start, __preinit_a
 static void custom_init(void) { init_range(__init_array_start, __init_array_end); }
 static void custom_fini(void) { init_range(__fini_array_start, __fini_array_end); }
  
-void __attribute__((noreturn)) __attribute__((section(".start"))) _start(void)
+//void __attribute__((noreturn)) __attribute__((section(".start"))) _start(void* data)
+// XXX: ^^ This doesn't work because it gives a linker warning. How to fix!?
+void __attribute__((noreturn)) __attribute__((section(".start"))) _start()
 {
+	void* data;
+
+	asm volatile("mov %%rdi, %0" : "=r" (data));
+
 	fpu::fninit();
 	uint16_t cw = fpu::fstcw();
 	cw &= ~1;           // Clean IM bit: generate invalid operation exceptions
@@ -160,7 +168,7 @@ void __attribute__((noreturn)) __attribute__((section(".start"))) _start(void)
 	custom_preinit();
 	custom_init();
 
-	int exit_code = main();
+	int exit_code = main(data);
 
 	custom_fini();
 
@@ -171,8 +179,18 @@ void __attribute__((noreturn)) __attribute__((section(".start"))) _start(void)
 dispatcher d;
 sender_test st(d);
 
-int main()
+int main(void* data)
 {
+	input_data* args = (input_data*) data;
+
+	st.puts("args.a: ");
+	st.pdint(args->a);
+	st.putc('\n');
+	st.puts("args.b: ");
+	st.pdint(args->b);
+	st.putc('\n');
+
+
 	st.puts("_code_end: ");
 	st.pxint((uint64_t) &_code_end);
 	st.putc('\n');

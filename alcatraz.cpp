@@ -176,7 +176,7 @@ void alcatraz::print_regs(kvm_regs& regs)
 	print_reg("rflags", regs.rflags);
 }
 
-int alcatraz::run()
+int alcatraz::run(void* data, size_t data_len)
 {
 	/* Create a virtual CPU instance on the virtual machine */
 	auto vcpu = machine->create_vcpu();
@@ -194,8 +194,14 @@ int alcatraz::run()
 	regs.rflags = 2;
 	regs.rip = entry_point; // Execution starts directly at the start of the virtual memmory
 
-	/* Create stack right below the page tables and grow down. */
-	regs.rsp = entry_point + mem_size;
+	/* Create stack right below the input data and page tables and grow down. */
+	regs.rsp = entry_point + mem_size - data_len;
+	if (data)
+	{
+		regs.rdi = regs.rsp;
+		memcpy((void*) ((uintptr_t) mem + mem_size - data_len), data, data_len);
+	}
+
 	vcpu->set_regs(regs);
 
 	mem_convert converter(mem, mem_size, entry_point);
