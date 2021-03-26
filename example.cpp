@@ -7,7 +7,7 @@
 #include "kvmpp/example/cpudefs.h"
 
 const uint64_t virtual_offset = 2048 * 1024; // Virtual memory starts at 2MB */
-const size_t mem_size = 2048 * 1024;
+const size_t mem_size = 2048 * 1024 * 10;
 
 static void setup_64bit_code_segment(struct kvm_sregs *sregs)
 {
@@ -30,7 +30,7 @@ static void setup_64bit_code_segment(struct kvm_sregs *sregs)
 	sregs->ds = sregs->es = sregs->fs = sregs->gs = sregs->ss = seg;
 }
 
-static size_t setup_long_mode(void *page_mem_p, struct kvm_sregs *sregs)
+static size_t XXXsetup_long_mode(void *page_mem_p, struct kvm_sregs *sregs)
 {   
 	char* mem = (char*) page_mem_p;
 
@@ -46,7 +46,61 @@ static size_t setup_long_mode(void *page_mem_p, struct kvm_sregs *sregs)
 	pml4[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pdpt_addr;
 	pdpt[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pd_addr;
 	pd[0] = 0;//PDE64_PRESENT | PDE64_RW | PDE64_USER | PDE64_PS;
-	pd[1] = PDE64_PRESENT | PDE64_RW | PDE64_USER | PDE64_PS;
+	for (int i = 0; i < 10; i++)
+	{
+		pd[i + 1] = PDE64_PRESENT | PDE64_RW | PDE64_USER | PDE64_PS | (i * (2 << 20));
+	}
+
+	sregs->cr3 = pml4_addr;
+	sregs->cr4
+		= CR4_PAE			
+		| CR4_OSFXSR		// Set OSFXSR bit (Enable SSE support)	
+		| CR4_OSXMMEXCPT	// Set OSXMMEXCPT bit (Enable unmasked SSE exceptions)
+		| CR4_PGE;			// Set Page Global Enabled
+	sregs->cr0
+		= CR0_PE | CR0_MP | CR0_ET | CR0_NE | CR0_WP | CR0_AM | CR0_PG
+		| CR0_NE	// Set NE bit (Native Exceptions)
+		| CR0_MP;	// Set MP bit (FWAIT exempt from the TS bit)
+
+	sregs->efer = EFER_LME | EFER_LMA;
+
+	setup_64bit_code_segment(sregs);
+
+	return 0x3000;
+}
+
+static size_t setup_long_mode(void *page_mem_p, struct kvm_sregs *sregs)
+{   
+	char* mem = (char*) page_mem_p;
+
+	uint64_t p = mem_size + 4096;
+
+	uint64_t pml4_addr = mem_size;
+	uint64_t *pml4 = (uint64_t *)(mem);
+
+	for (size_t virt = virtual_offset; virt < mem_size + virtual_offset; virt += 2 << 20)
+	{
+		uint64_t pml4e = (virt >> 39) & 511;
+		uint64_t pdpe = (virt >> 30) & 511;
+		uint64_t pde = (virt >> 21) & 511;
+
+		if (!(pml4[pml4e] & PDE64_PRESENT))
+		{
+			pml4[pml4e] = PDE64_PRESENT | PDE64_RW | PDE64_USER | p;
+			p += 4096;
+		}
+		uint64_t* pdpt = (uint64_t*) (mem + (pml4[pml4e] & (~(4096 - 1))) - mem_size);
+
+		if (!(pdpt[pdpe] & PDE64_PRESENT))
+		{
+			pdpt[pdpe] = PDE64_PRESENT | PDE64_RW | PDE64_USER | p;
+			p += 4096;
+		}
+		uint64_t* pd = (uint64_t*) (mem + (pdpt[pdpe] & (~(4096 - 1))) - mem_size);
+		
+		/* Finally,the actual page */
+		pd[pde] = PDE64_PRESENT | PDE64_RW | PDE64_USER | PDE64_PS | (virt - virtual_offset);
+	}
 
 	sregs->cr3 = pml4_addr;
 	sregs->cr4
@@ -168,7 +222,7 @@ int main()
 	/* Stick it in slot 0 */
 	machine->set_user_memory_region(0, 0, 0, mem_size, mem);
 
-	size_t page_mem_size = 4096 * 3;
+	size_t page_mem_size = 1028*2048; //4096 * 3;
 	void* page_mem = mmap(NULL, page_mem_size, PROT_READ | PROT_WRITE,
 			MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
 
@@ -192,7 +246,7 @@ int main()
 	regs.rip = virtual_offset; // Execution starts directly at the start of the virtual memmory
 
 	/* Create stack right below the page tables and grow down. */
-	regs.rsp = virtual_offset + mem_size - pg_table_size;
+	regs.rsp = virtual_offset + mem_size;
 	vcpu->set_regs(regs);
 
 	/* Copy the guest code */
