@@ -28,4 +28,4 @@ ld -b binary -r guest64.img -o guest64.img.o
 ld -T payload.ld -o payload.o
 
 # Finally, compile the application
-g++ -std=c++17 -o example payload.o example.cpp kvmpp/src/kvmpp.cpp  && ./example 
+g++ -std=c++17 -ggdb -o example payload.o example.cpp kvmpp/src/kvmpp.cpp  && ./example 

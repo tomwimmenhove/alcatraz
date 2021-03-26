@@ -69,14 +69,20 @@ static size_t XXXsetup_long_mode(void *page_mem_p, struct kvm_sregs *sregs)
 	return 0x3000;
 }
 
-static size_t setup_long_mode(void *page_mem_p, struct kvm_sregs *sregs)
-{   
-	char* mem = (char*) page_mem_p;
+#include <vector>
 
-	uint64_t p = mem_size + 4096;
+struct page_table
+{
+	uint64_t entries[512];
+};
 
-	uint64_t pml4_addr = mem_size;
-	uint64_t *pml4 = (uint64_t *)(mem);
+static std::vector<page_table> setup_long_mode(struct kvm_sregs *sregs)
+{
+	std::vector<page_table> pages;
+
+	pages.push_back(page_table{});
+
+	const size_t pml4e_idx = 0;
 
 	for (size_t virt = virtual_offset; virt < mem_size + virtual_offset; virt += 2 << 20)
 	{
@@ -84,25 +90,27 @@ static size_t setup_long_mode(void *page_mem_p, struct kvm_sregs *sregs)
 		uint64_t pdpe = (virt >> 30) & 511;
 		uint64_t pde = (virt >> 21) & 511;
 
-		if (!(pml4[pml4e] & PDE64_PRESENT))
+		if (!(pages[pml4e_idx].entries[pml4e] & PDE64_PRESENT))
 		{
-			pml4[pml4e] = PDE64_PRESENT | PDE64_RW | PDE64_USER | p;
-			p += 4096;
+			pages[pml4e_idx].entries[pml4e] = PDE64_PRESENT | PDE64_RW | PDE64_USER |
+				((pages.size() << 12) + mem_size);
+			pages.push_back(page_table{});
 		}
-		uint64_t* pdpt = (uint64_t*) (mem + (pml4[pml4e] & (~(4096 - 1))) - mem_size);
+		size_t pdp_idx = (pages[pml4e_idx].entries[pml4e] - mem_size) >> 12;
 
-		if (!(pdpt[pdpe] & PDE64_PRESENT))
+		if (!(pages[pdp_idx].entries[pdpe] & PDE64_PRESENT))
 		{
-			pdpt[pdpe] = PDE64_PRESENT | PDE64_RW | PDE64_USER | p;
-			p += 4096;
+			pages[pdp_idx].entries[pdpe] = PDE64_PRESENT | PDE64_RW | PDE64_USER |
+				((pages.size() << 12) + mem_size);
+			pages.push_back(page_table{});
 		}
-		uint64_t* pd = (uint64_t*) (mem + (pdpt[pdpe] & (~(4096 - 1))) - mem_size);
+		size_t pd_idx = (pages[pdp_idx].entries[pdpe] - mem_size) >> 12;
 		
 		/* Finally,the actual page */
-		pd[pde] = PDE64_PRESENT | PDE64_RW | PDE64_USER | PDE64_PS | (virt - virtual_offset);
+		pages[pd_idx].entries[pde] = PDE64_PRESENT | PDE64_RW | PDE64_USER | PDE64_PS | (virt - virtual_offset);
 	}
 
-	sregs->cr3 = pml4_addr;
+	sregs->cr3 = mem_size;
 	sregs->cr4
 		= CR4_PAE			
 		| CR4_OSFXSR		// Set OSFXSR bit (Enable SSE support)	
@@ -117,7 +125,7 @@ static size_t setup_long_mode(void *page_mem_p, struct kvm_sregs *sregs)
 
 	setup_64bit_code_segment(sregs);
 
-	return 0x3000;
+	return pages;
 }
 
 #include "rpcbuf/src/rpcbuf.h"
@@ -222,12 +230,6 @@ int main()
 	/* Stick it in slot 0 */
 	machine->set_user_memory_region(0, 0, 0, mem_size, mem);
 
-	size_t page_mem_size = 1028*2048; //4096 * 3;
-	void* page_mem = mmap(NULL, page_mem_size, PROT_READ | PROT_WRITE,
-			MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
-
-	machine->set_user_memory_region(1, 0, mem_size, page_mem_size, page_mem);
-
 
 	/* Create a virtual CPU instance on the virtual machine */
 	auto vcpu = machine->create_vcpu();
@@ -235,8 +237,18 @@ int main()
 	/* Setup the special registers */
 	struct kvm_sregs sregs;
 	vcpu->get_sregs(sregs);
-	size_t pg_table_size = setup_long_mode(page_mem, &sregs);
+
+	/* Create the page tables */
+	std::vector<page_table> pages = setup_long_mode(&sregs);
 	vcpu->set_sregs(sregs);
+
+	/* Copy page table sinto mmapped memory */
+	size_t page_mem_size = pages.size() * sizeof(page_table);
+	void* page_mem = mmap(NULL, page_mem_size, PROT_READ | PROT_WRITE,
+			MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+	memcpy(page_mem, pages.data(), page_mem_size);
+	/* Put physical page table memory in slot 1 */
+	machine->set_user_memory_region(1, 0, mem_size, page_mem_size, page_mem);
 
 	/* Set up the general registers */
 	struct kvm_regs regs;
