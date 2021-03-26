@@ -2,12 +2,15 @@
 #include <iostream>
 #include <iomanip>
 #include <sys/mman.h>
+#include <vector>
 
 #include "kvmpp/src/kvmpp.h"
 #include "kvmpp/example/cpudefs.h"
 
-const uint64_t virtual_offset = 2048 * 1024; // Virtual memory starts at 2MB */
-const size_t mem_size = 2048 * 1024 * 10;
+const uint64_t virtual_offset = 2048 * 1024; // Virtual memory starts after the fist 2MB page*/
+const size_t mem_size = (size_t) 2048 * 1024;
+
+const size_t mem_pages_start = mem_size; // Put the page tables behind the 'normal' physical memory
 
 static void setup_64bit_code_segment(struct kvm_sregs *sregs)
 {
@@ -30,87 +33,54 @@ static void setup_64bit_code_segment(struct kvm_sregs *sregs)
 	sregs->ds = sregs->es = sregs->fs = sregs->gs = sregs->ss = seg;
 }
 
-static size_t XXXsetup_long_mode(void *page_mem_p, struct kvm_sregs *sregs)
-{   
-	char* mem = (char*) page_mem_p;
-
-	uint64_t pml4_addr = mem_size;
-	uint64_t *pml4 = (uint64_t *)(mem);
-
-	uint64_t pdpt_addr = mem_size + 0x1000;
-	uint64_t *pdpt = (uint64_t *)(mem + 0x1000);
-
-	uint64_t pd_addr = mem_size + 0x2000;
-	uint64_t *pd = (uint64_t *)(mem + 0x2000);
-
-	pml4[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pdpt_addr;
-	pdpt[0] = PDE64_PRESENT | PDE64_RW | PDE64_USER | pd_addr;
-	pd[0] = 0;//PDE64_PRESENT | PDE64_RW | PDE64_USER | PDE64_PS;
-	for (int i = 0; i < 10; i++)
-	{
-		pd[i + 1] = PDE64_PRESENT | PDE64_RW | PDE64_USER | PDE64_PS | (i * (2 << 20));
-	}
-
-	sregs->cr3 = pml4_addr;
-	sregs->cr4
-		= CR4_PAE			
-		| CR4_OSFXSR		// Set OSFXSR bit (Enable SSE support)	
-		| CR4_OSXMMEXCPT	// Set OSXMMEXCPT bit (Enable unmasked SSE exceptions)
-		| CR4_PGE;			// Set Page Global Enabled
-	sregs->cr0
-		= CR0_PE | CR0_MP | CR0_ET | CR0_NE | CR0_WP | CR0_AM | CR0_PG
-		| CR0_NE	// Set NE bit (Native Exceptions)
-		| CR0_MP;	// Set MP bit (FWAIT exempt from the TS bit)
-
-	sregs->efer = EFER_LME | EFER_LMA;
-
-	setup_64bit_code_segment(sregs);
-
-	return 0x3000;
-}
-
-#include <vector>
-
 struct page_table
 {
 	uint64_t entries[512];
 };
 
+void map_page(uint64_t virt, uint64_t phys, uint64_t phys_pages_start, std::vector<page_table>& pages)
+{
+	uint64_t pml4e = (virt >> 39) & 511;
+	uint64_t pdpe = (virt >> 30) & 511;
+	uint64_t pde = (virt >> 21) & 511;
+
+	const size_t pml4e_idx = 0;
+
+	if (pages.size() == 0)
+	{
+		pages.push_back(page_table{});
+	}
+
+	if (!(pages[pml4e_idx].entries[pml4e] & PDE64_PRESENT))
+	{
+		pages[pml4e_idx].entries[pml4e] = PDE64_PRESENT | PDE64_RW | PDE64_USER |
+			((pages.size() << 12) + phys_pages_start);
+		pages.push_back(page_table{});
+	}
+	size_t pdp_idx = (pages[pml4e_idx].entries[pml4e] - phys_pages_start) >> 12;
+
+	if (!(pages[pdp_idx].entries[pdpe] & PDE64_PRESENT))
+	{
+		pages[pdp_idx].entries[pdpe] = PDE64_PRESENT | PDE64_RW | PDE64_USER |
+			((pages.size() << 12) + phys_pages_start);
+		pages.push_back(page_table{});
+	}
+	size_t pd_idx = (pages[pdp_idx].entries[pdpe] - phys_pages_start) >> 12;
+
+	/* Finally,the actual page */
+	pages[pd_idx].entries[pde] = PDE64_PRESENT | PDE64_RW | PDE64_USER | PDE64_PS | phys;
+}
+
 static std::vector<page_table> setup_long_mode(struct kvm_sregs *sregs)
 {
 	std::vector<page_table> pages;
 
-	pages.push_back(page_table{});
-
-	const size_t pml4e_idx = 0;
-
 	for (size_t virt = virtual_offset; virt < mem_size + virtual_offset; virt += 2 << 20)
 	{
-		uint64_t pml4e = (virt >> 39) & 511;
-		uint64_t pdpe = (virt >> 30) & 511;
-		uint64_t pde = (virt >> 21) & 511;
-
-		if (!(pages[pml4e_idx].entries[pml4e] & PDE64_PRESENT))
-		{
-			pages[pml4e_idx].entries[pml4e] = PDE64_PRESENT | PDE64_RW | PDE64_USER |
-				((pages.size() << 12) + mem_size);
-			pages.push_back(page_table{});
-		}
-		size_t pdp_idx = (pages[pml4e_idx].entries[pml4e] - mem_size) >> 12;
-
-		if (!(pages[pdp_idx].entries[pdpe] & PDE64_PRESENT))
-		{
-			pages[pdp_idx].entries[pdpe] = PDE64_PRESENT | PDE64_RW | PDE64_USER |
-				((pages.size() << 12) + mem_size);
-			pages.push_back(page_table{});
-		}
-		size_t pd_idx = (pages[pdp_idx].entries[pdpe] - mem_size) >> 12;
-		
-		/* Finally,the actual page */
-		pages[pd_idx].entries[pde] = PDE64_PRESENT | PDE64_RW | PDE64_USER | PDE64_PS | (virt - virtual_offset);
+		map_page(virt, virt - virtual_offset, mem_pages_start, pages);
 	}
 
-	sregs->cr3 = mem_size;
+	sregs->cr3 = mem_pages_start;
 	sregs->cr4
 		= CR4_PAE			
 		| CR4_OSFXSR		// Set OSFXSR bit (Enable SSE support)	
@@ -248,7 +218,7 @@ int main()
 			MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
 	memcpy(page_mem, pages.data(), page_mem_size);
 	/* Put physical page table memory in slot 1 */
-	machine->set_user_memory_region(1, 0, mem_size, page_mem_size, page_mem);
+	machine->set_user_memory_region(1, 0, mem_pages_start, page_mem_size, page_mem);
 
 	/* Set up the general registers */
 	struct kvm_regs regs;
