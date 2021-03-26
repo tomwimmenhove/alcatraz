@@ -38,8 +38,8 @@ alcatraz::alcatraz(uint64_t mem_size, uint64_t entry_point, const void* vm_code,
 	std::vector<page_table> pages = create_page_tables();
 
 	/* Copy page table sinto mmapped memory */
-	size_t page_mem_size = pages.size() * sizeof(page_table);
-	void* page_mem = mmap(NULL, page_mem_size, PROT_READ | PROT_WRITE,
+	page_mem_size = pages.size() * sizeof(page_table);
+	page_mem = mmap(NULL, page_mem_size, PROT_READ | PROT_WRITE,
 			MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
 	memcpy(page_mem, pages.data(), page_mem_size);
 
@@ -53,6 +53,9 @@ alcatraz::alcatraz(uint64_t mem_size, uint64_t entry_point, const void* vm_code,
 alcatraz::~alcatraz()
 {
 	kvm::get_instance()->destroy();
+
+	munmap(page_mem, page_mem_size);
+	munmap(mem, mem_size);
 }
 
 void alcatraz::set_receiver(std::unique_ptr<call_receiver>&& receiver)
@@ -148,7 +151,9 @@ void alcatraz::setup_long_mode(struct kvm_sregs *sregs)
 
 void alcatraz::print_reg(std::string name, uint64_t value)
 {
-	std::cout << name << ": 0x" << std::hex << std::setfill('0') << std::setw(16) << value << " (" << std::dec << value << ")\n";
+	std::cerr << name << ": 0x" << std::hex
+		      << std::setfill('0') << std::setw(16) 
+			  << value << " (" << std::dec << value << ")\n";
 }
 
 void alcatraz::print_regs(kvm_regs& regs)
@@ -217,9 +222,6 @@ int alcatraz::run(void* data, size_t data_len)
 			{
 				kvm_regs regs;
 				vcpu->get_regs(regs);
-				std::cout << "Result: " << std::dec << regs.rax
-					      << " (" << std::hex << regs.rax
-						  << "), rip=" << ((void*) regs.rip)<< '\n';
 
 				return run->exit_reason;
 			}
@@ -251,7 +253,7 @@ int alcatraz::run(void* data, size_t data_len)
 				}
 				else
 				{
-					std::cout << "Unknown IO error. Port=" << run->io.port
+					std::cerr << "Unknown IO error. Port=" << run->io.port
 						      << ", size=" << (run->io.size * 8)
 							  << "bits, direction:" << (run->io.direction == KVM_EXIT_IO_OUT
 									  ? "out"
@@ -266,16 +268,8 @@ int alcatraz::run(void* data, size_t data_len)
 			default:
 			{
 				auto regs = vcpu->get_regs();
-				std::cout << "VCPU exited with reason: " << run->exit_reason
+				std::cerr << "VCPU exited with reason: " << run->exit_reason
 					      << ", rip=" << ((void*) regs.rip)<< '\n';
-
-				unsigned char* ripdat = (unsigned char*) mem + regs.rip;
-				std::cout << "Data at rip: ";
-				for (int i = 0; i < 15; i++)
-				{
-					std::cout << std::hex << std::setfill('0') << std::setw(2) << ((int) ripdat[i]) << ' ';
-				}
-				std::cout << '\n';
 
 				print_regs(regs);
 

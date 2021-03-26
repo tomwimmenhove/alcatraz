@@ -31,12 +31,14 @@ private:
 	void print_regs(kvm_regs& regs);
 
 private:
+	void* mem;
 	size_t mem_size;
+	void* page_mem;
+	size_t page_mem_size;
 	uint64_t entry_point;
 	size_t mem_pages_start;
 	std::unique_ptr<kvm_machine> machine;
 	std::unique_ptr<call_receiver> receiver;
-	void* mem;
 };
 
 #endif /* ALCATRAZ_H */
