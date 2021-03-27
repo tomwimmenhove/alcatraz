@@ -33,16 +33,3 @@ $(DEPDIR)/%.d: ;
 	.PRECIOUS: $(DEPDIR)/%.d
 
 include $(wildcard $(patsubst %,$(DEPDIR)/%.d,$(basename $(SRCS))))
-
-
-
-# Compile the startup and guest code
-
-#gcc  -c crti.S -o crti.o
-#gcc  -c crtn.S -o crtn.o
-
-#g++ -I../../rpcbuf/src/ -std=c++17 -fno-threadsafe-statics  -ggdb -DDEBUG -fstack-protector-all -O2  -nostdlib -ffreestanding -lgcc -mcmodel=kernel -fno-pic -ffunction-sections -fdata-sections -Wl,gc-sections -fno-exceptions -fno-rtti -c -o guest_init.o guest_init.cpp || exit
-
-#g++ -I../../rpcbuf/src/ -std=c++17 -fno-threadsafe-statics  -ggdb -DDEBUG -fstack-protector-all -O2  -nostdlib -ffreestanding -lgcc -mcmodel=kernel -fno-pic -ffunction-sections -fdata-sections -Wl,gc-sections -fno-exceptions -fno-rtti -c -o klib.o klib.cpp || exit
-
-#ar -rcs libguest.ai crti.o $CRTBEGIN_OBJ guest_init.o klib.o $CRTEND_OBJ crtn.o 
