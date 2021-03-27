@@ -3,5 +3,6 @@
 **/*.img
 **/*.o
 **/*.a
+**/.d
 example/example
 
