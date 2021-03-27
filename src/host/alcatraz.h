@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "kvmpp/src/kvmpp.h"
+#include <kvmpp.h>
 
 class alcatraz
 {

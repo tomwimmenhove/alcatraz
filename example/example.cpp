@@ -1,8 +1,8 @@
 #include <string.h>
 #include <iostream>
 
-#include "rpcbuf/src/rpcbuf.h"
-#include "rpcbuf/src/call_in_definitions.h"
+#include "rpcbuf.h"
+#include "call_in_definitions.h"
 
 #include "alcatraz.h"
 

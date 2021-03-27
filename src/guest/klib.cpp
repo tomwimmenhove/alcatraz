@@ -1,3 +1,5 @@
+/* Taken from https://github.com/tomwimmenhove/toyos */
+
 #include "klib.h"
 #include "malloc.h"
 

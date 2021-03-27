@@ -4,8 +4,8 @@
 #include <sys/mman.h>
 #include <vector>
 
-#include "kvmpp/example/cpudefs.h"
-#include "rpcbuf/src/rpcbuf.h"
+#include "cpudefs.h"
+#include "rpcbuf.h"
 #include "mem_convert.h"
 
 #include "alcatraz.h"

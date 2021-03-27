@@ -1,3 +1,5 @@
+/* Taken from https://github.com/tomwimmenhove/toyos */
+
 #ifndef KLIB_H
 #define KLIB_H
 

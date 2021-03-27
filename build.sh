@@ -1,24 +1,21 @@
 #!/bin/bash
 
-#if 1
 CRTBEGIN_OBJ=`g++ -print-file-name=crtbegin.o`
 CRTEND_OBJ=`g++ -print-file-name=crtend.o`
-#else
-CRTBEGIN_OBJ=crt/crtbegin.o
-CRTEND_OBJ=crt/crtend.o
-#endif
 
 # Compile the startup and guest code
 
 gcc  -c crti.S -o crti.o
 gcc  -c crtn.S -o crtn.o
 
+g++ -std=c++17 -fno-threadsafe-statics  -ggdb -DDEBUG -fstack-protector-all -O2  -nostdlib -ffreestanding -lgcc -mcmodel=kernel -fno-pic -ffunction-sections -fdata-sections -Wl,gc-sections -fno-exceptions -fno-rtti -c -o guest_init.o guest_init.cpp || exit
+
 g++ -std=c++17 -fno-threadsafe-statics  -ggdb -DDEBUG -fstack-protector-all -O2  -nostdlib -ffreestanding -lgcc -mcmodel=kernel -fno-pic -ffunction-sections -fdata-sections -Wl,gc-sections -fno-exceptions -fno-rtti -c -o guest64.o guest.cpp || exit
 
 g++ -std=c++17 -fno-threadsafe-statics  -ggdb -DDEBUG -fstack-protector-all -O2  -nostdlib -ffreestanding -lgcc -mcmodel=kernel -fno-pic -ffunction-sections -fdata-sections -Wl,gc-sections -fno-exceptions -fno-rtti -c -o klib.o klib.cpp || exit
 
 # Compile into an elf (easier for disassembly and debugging */
-ld -T linker.ld crti.o $CRTBEGIN_OBJ guest64.o klib.o $CRTEND_OBJ crtn.o -o guest64.elf
+ld -T linker.ld crti.o $CRTBEGIN_OBJ guest_init.o guest64.o klib.o $CRTEND_OBJ crtn.o -o guest64.elf
 
 # Create a raw binary
 objcopy -O binary guest64.elf guest64.img
