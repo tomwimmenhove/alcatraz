@@ -6,18 +6,17 @@
 #include "call_in_definitions.h"
 
 #include "alcatraz.h"
-
 #include "input_data.h"
 
-class receiver_test : public call_receiver
+class receiver : public call_receiver
 {
 #include "call_declarations.h"
 
 public:
-	receiver_test(alcatraz* box) : CALL_OUT_INIT, box(box)
-{   
-	setup();
-}
+	receiver(alcatraz* box) : CALL_OUT_INIT, box(box)
+	{   
+		setup();
+	}
 
 private:
 	void putc(char c) { std::cout << c; }
@@ -43,24 +42,25 @@ private:
 		return 0;
 	}
 
-
 	alcatraz* box;
 };
 
+extern const unsigned char guest64[], guest64_end[];
+
 int main()
 {
-	extern const unsigned char guest64[], guest64_end[];
-	alcatraz a(2048 * 1024 * 10, guest64, guest64_end-guest64);
+	const size_t mem_size = 2048 * 1024 * 10;
 
-	auto rt = std::make_unique<receiver_test>(&a);
+	alcatraz box(mem_size, guest64, guest64_end-guest64);
+	auto rt = std::make_unique<receiver>(&box);
 
-	a.set_receiver(std::move(rt));
+	box.set_receiver(std::move(rt));
 
 	input_data args;
 	args.a = 42;
 	args.b = 43;
 
-	a.run(&args, sizeof(input_data));
+	box.run(&args, sizeof(input_data));
 
 	return 0;
 }

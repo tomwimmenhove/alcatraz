@@ -1,5 +1,5 @@
 /* 
- * This file is part of the rpcbuf distribution (https://github.com/tomwimmenhove/rpcbuf).
+ * This file is part of the alcatraz distribution (https://github.com/tomwimmenhove/alcatraz).
  * Copyright (c) 2021 Tom Wimmenhove.
  * 
  * This program is free software: you can redistribute it and/or modify  
@@ -15,7 +15,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-DEFINE_CALL_START;
+DEFINE_CALL_START(receiver);
 DEFINE_CALL(putc, void(char));
 DEFINE_CALL(dint, void(uint64_t));
 DEFINE_CALL(pxint, void(uint64_t));
