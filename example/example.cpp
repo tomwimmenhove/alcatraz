@@ -34,7 +34,7 @@ private:
 int main()
 {
 	extern const unsigned char guest64[], guest64_end[];
-	alcatraz a(2048 * 1024 * 10, 2048 * 1024, guest64, guest64_end-guest64);
+	alcatraz a(2048 * 1024 * 10, guest64, guest64_end-guest64);
 
 	auto rt = std::make_unique<receiver_test>(a.get_mem());
 

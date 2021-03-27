@@ -8,7 +8,7 @@
 class alcatraz
 {
 public:
-	alcatraz(uint64_t mem_size, uint64_t entry_point, const void* vm_code, size_t vm_code_size);
+	alcatraz(uint64_t mem_size, const void* vm_code, size_t vm_code_size);
 	
 	void set_receiver(std::unique_ptr<call_receiver>&& receiver);
 	void* get_mem();
@@ -35,7 +35,7 @@ private:
 	size_t mem_size;
 	void* page_mem;
 	size_t page_mem_size;
-	uint64_t entry_point;
+	const uint64_t entry_point = 0x0000000000200000; // As defined in src/guest/linker.ld
 	size_t mem_pages_start;
 	std::unique_ptr<kvm_machine> machine;
 	std::unique_ptr<call_receiver> receiver;

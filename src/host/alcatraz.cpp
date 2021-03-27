@@ -10,9 +10,8 @@
 
 #include "alcatraz.h"
 
-alcatraz::alcatraz(uint64_t mem_size, uint64_t entry_point, const void* vm_code, size_t vm_code_size)
-	: mem_size(mem_size), mem_pages_start(mem_size),
-	entry_point(entry_point)
+alcatraz::alcatraz(uint64_t mem_size, const void* vm_code, size_t vm_code_size)
+	: mem_size(mem_size), mem_pages_start(mem_size)
 {
 	/* Get the KVM instance */
 	auto kvm = kvm::get_instance();
