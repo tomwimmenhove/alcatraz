@@ -1,5 +1,7 @@
 #include <cstdint>
 
+#include <stdlib.h>
+
 extern "C"
 {
 	void _start(void* data, void* user_mem);

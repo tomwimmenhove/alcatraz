@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -11,24 +13,12 @@
 extern void* heap_start;
 static uintptr_t new_p;
 
-void *operator new(size_t size)
-{
-	uintptr_t p = new_p;
-	new_p += size;
+void *operator new[](size_t size);
+void *operator new(size_t size);
 
-	return (void*) p;
-}
+void operator delete(void *) throw();
+void operator delete[](void *) throw();
 
-void *operator new[](size_t size)
-{
-	uintptr_t p = new_p;
-	new_p += size;
-
-	return (void*) p;
-}
-
-void operator delete(void *) throw() { }
-void operator delete[](void *) throw() { }
 void operator delete(void*, long unsigned int) { }
 void operator delete [](void*, long unsigned int) { }
 
@@ -93,6 +83,8 @@ extern void* _code_end;
 
 int guest_main(void* data)
 {
+	auto test = new A_CLASS_WITH_A_CONSTRUCTOR(100);
+
 	new_p = (intptr_t) heap_start;
 
 	input_data* args = (input_data*) data;
@@ -121,6 +113,23 @@ int guest_main(void* data)
 
 	puts("&a: ");
 	st.pxint((uint64_t) &a);
+	st.putc('\n');
+
+	void* p1 = malloc(10000);
+	void* p2 = malloc(10000);
+	free(p1);
+	void* p3 = malloc(10000);
+
+	puts("p1: ");
+	st.pxint((uint64_t) p1);
+	st.putc('\n');
+
+	puts("p2: ");
+	st.pxint((uint64_t) p2);
+	st.putc('\n');
+
+	puts("p3: ");
+	st.pxint((uint64_t) p3);
 	st.putc('\n');
 
 	/* Crude memcheck */
