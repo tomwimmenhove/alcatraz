@@ -24,7 +24,9 @@ static void init_range(func_ptr* start, func_ptr* end)
 static void custom_preinit(void) { init_range(__preinit_array_start, __preinit_array_end); }
 static void custom_init(void) { init_range(__init_array_start, __init_array_end); }
 static void custom_fini(void) { init_range(__fini_array_start, __fini_array_end); }
- 
+
+void* heap_start;
+
 //void __attribute__((noreturn)) __attribute__((section(".start"))) _start(void* data)
 // XXX: ^^ This doesn't work because it gives a linker warning. How to fix!?
 void __attribute__((noreturn)) __attribute__((section(".start"))) _start()
@@ -32,6 +34,11 @@ void __attribute__((noreturn)) __attribute__((section(".start"))) _start()
 	/* We'll get the first argument this way instead... :( */
 	void* data;
 	asm volatile("mov %%rdi, %0" : "=r" (data));
+
+	uintptr_t user_mem;
+	asm volatile("mov %%rsi, %0" : "=r" (user_mem));
+
+	heap_start = (void*) ((user_mem + 4095) & (~4095));
 
 	uint16_t fpu_contorl;
 	asm volatile("fninit\n"

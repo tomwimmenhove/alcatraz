@@ -7,11 +7,12 @@
 
 #include "../input_data.h"
 
-static uint64_t new_p = 1024 * 1024;
+extern void* heap_start;
+static uintptr_t new_p;
 
 void *operator new(size_t size)
 {
-	uint64_t p = new_p;
+	uintptr_t p = new_p;
 	new_p += size;
 
 	return (void*) p;
@@ -19,7 +20,7 @@ void *operator new(size_t size)
 
 void *operator new[](size_t size)
 {
-	uint64_t p = new_p;
+	uintptr_t p = new_p;
 	new_p += size;
 
 	return (void*) p;
@@ -108,6 +109,8 @@ extern void* _code_end;
 
 int guest_main(void* data)
 {
+	new_p = (intptr_t) heap_start;
+
 	input_data* args = (input_data*) data;
 
 	puts("Hello world!\n");
@@ -126,6 +129,14 @@ int guest_main(void* data)
 
 	puts("_data_end: ");
 	st.pxint((uint64_t) &_data_end);
+	st.putc('\n');
+
+	puts("heap_start: ");
+	st.pxint((uint64_t) heap_start);
+	st.putc('\n');
+
+	puts("&a: ");
+	st.pxint((uint64_t) &a);
 	st.putc('\n');
 
 	/* Crude memcheck */

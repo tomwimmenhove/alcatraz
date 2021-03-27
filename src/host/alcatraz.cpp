@@ -10,7 +10,7 @@
 #include "alcatraz.h"
 
 alcatraz::alcatraz(uint64_t mem_size, const void* vm_code, size_t vm_code_size)
-	: mem_size(mem_size), mem_pages_start(mem_size)
+	: mem_size(mem_size), mem_pages_start(mem_size), vm_code_size(vm_code_size)
 {
 	/* Get the KVM instance */
 	auto kvm = kvm::get_instance();
@@ -200,9 +200,13 @@ int alcatraz::run(void* data, size_t data_len)
 	regs.rsp = entry_point + mem_size - data_len;
 	if (data)
 	{
+		/* Make the first argument to _start() point to the input data structure */
 		regs.rdi = regs.rsp;
 		memcpy((void*) ((uintptr_t) mem + mem_size - data_len), data, data_len);
 	}
+
+	/* Second argument points to the starts of usable empty memory */
+	regs.rsi = entry_point + vm_code_size;
 
 	vcpu->set_regs(regs);
 

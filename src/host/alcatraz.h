@@ -35,6 +35,7 @@ private:
 private:
 	void* mem;
 	size_t mem_size;
+	size_t vm_code_size;
 	void* page_mem;
 	size_t page_mem_size;
 	const uint64_t entry_point = 0x0000000000200000; // As defined in src/guest/linker.ld
