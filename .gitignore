@@ -3,4 +3,5 @@
 **/*.img
 **/*.o
 **/*.a
+example/example
 

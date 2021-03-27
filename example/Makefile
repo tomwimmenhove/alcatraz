@@ -13,20 +13,20 @@ AS = gcc # Handles defines through the cpp pre-processor, gas does not.
 LD = ld
 AR = ar
 
-OBJS = example.o guest/payload.o 
+OBJS = example.o
 SRCS = example.cpp
 
-all: example
+all: makeguest example
+
+makeguest:
+	make -C guest
 
 %.o: %.cpp
 	$(CPP) $(CPPFLAGS) -c $<
 	$(POSTCOMPILE)
 
-example: example.o guest/payload.o
+example: example.o guest/payload.o ../kvmpp/src/kvmpp.o ../src/host/libhost.a
 	$(CPP) example.o ../kvmpp/src/kvmpp.o guest/payload.o -o example -L ../src/host/ -lhost
-
-guest/payload.o:
-	make -C guest
 
 clean:
 	rm -f *.o

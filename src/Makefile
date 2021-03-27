@@ -1,9 +1,5 @@
-all: host/libhost.a guest/libguest.a
-
-host/libhost.a:
+all:
 	make -C host
-
-guest/libguest.a:
 	make -C guest
 
 clean:

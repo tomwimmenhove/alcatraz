@@ -7,7 +7,6 @@
 
 extern "C" 
 {
-	int __cxa_atexit(void (*f)(void*), void *objptr, void *dso);
 	void __attribute__((noreturn)) __assert_func(const char* file, int line, const char* fn, const char* assertion);
 	void __attribute__((noreturn)) __stack_chk_fail(void);
 	void __cxa_pure_virtual();
@@ -144,14 +143,6 @@ void __cxa_pure_virtual()
 {
 		for(;;);
 //	panic("Virtual method called");
-}
-
-int __cxa_atexit(void (*f)(void*), void *objptr, void *dso);
-
-int __cxa_atexit(void (*)(void*), void*, void*)
-{
-	/* Pffrt. There is no exit. */
-	return 0;
 }
 
 void __attribute__((noreturn)) __assert_func(const char* file, int line, const char* fn, const char* assertion)
