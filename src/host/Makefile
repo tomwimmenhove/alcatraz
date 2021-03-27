@@ -14,14 +14,10 @@ AS = gcc # Handles defines through the cpp pre-processor, gas does not.
 LD = ld
 AR = ar
 
-OBJS = alcatraz.o kvmpp.o
-SRCS = alcatraz.cpp ../../kvmpp/src/kvmpp.cpp
+OBJS = alcatraz.o
+SRCS = alcatraz.cpp
 
 all: libhost.a
-
-kvmpp.o: ../../kvmpp/src/kvmpp.cpp
-	$(CPP) $(CPPFLAGS) -c $<
-	$(POSTCOMPILE)
 
 %.o: %.cpp
 	$(CPP) $(CPPFLAGS) -c $<
@@ -31,7 +27,7 @@ libhost.a: $(OBJS)
 	$(AR) $(ARFLAGS) $@ $(OBJS)
 
 clean:
-	rm -rf *.o *.a
+	rm -f *.o *.a
 
 $(DEPDIR)/%.d: ;
 	.PRECIOUS: $(DEPDIR)/%.d
