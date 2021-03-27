@@ -10,3 +10,6 @@ git clone --recursive https://github.com/tomwimmenhove/alcatraz.git
 cd alcatraz
 make example
 ```
+
+
+NOTE: Change CFLAGS in newlib Makefile to include -D_FORTIFY_SOURCE=0 on Ubuntu!

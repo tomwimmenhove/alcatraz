@@ -186,7 +186,7 @@ CCASFLAGS = -O2
 CCDEPMODE = depmode=gcc3
 CC_FOR_BUILD = gcc
 CC_FOR_NEWLIB = gcc -I/home/tom/code/sandboxer/example/guest/newlib/build/targ-include -I/home/tom/code/sandboxer/example/guest/newlib/newlib/libc/include
-CFLAGS = -O2
+CFLAGS = -O2 -D_FORTIFY_SOURCE=0
 CPP = 
 CPPFLAGS = 
 CRT0 = 

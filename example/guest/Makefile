@@ -30,7 +30,7 @@ alloc.o: alloc.cpp
 	$(POSTCOMPILE)
 
 guest.elf: guest.o alloc.o ../../src/guest/libguest.a
-	$(LD) $(LDFLAGS) guest.o alloc.o -o $@ -L ../../src/guest/ -l guest newlib/build/libc/libc.a
+	$(LD) $(LDFLAGS) guest.o alloc.o -o $@ -L ../../src/guest/ -l guest -L newlib/build/ -lc
 
 ../../src/guest/libguest.a:
 	make -C ../../src/guest/
