@@ -6,7 +6,6 @@
 
 #include "cpudefs.h"
 #include "rpcbuf.h"
-#include "mem_convert.h"
 
 #include "alcatraz.h"
 
@@ -27,6 +26,7 @@ alcatraz::alcatraz(uint64_t mem_size, const void* vm_code, size_t vm_code_size)
 		throw std::system_error(errno, std::generic_category());
 	}
 	memset(mem, 0, mem_size);
+	mem_converter = std::make_unique<mem_convert>(mem, mem_size, entry_point);
 
 	madvise(mem, mem_size, MADV_MERGEABLE);
 
@@ -61,8 +61,6 @@ void alcatraz::set_receiver(std::unique_ptr<call_receiver>&& receiver)
 {
 	this->receiver = std::move(receiver);
 }
-
-void* alcatraz::get_mem() { return mem; }
 
 void alcatraz::setup_64bit_code_segment(struct kvm_sregs *sregs)
 {
@@ -208,8 +206,6 @@ int alcatraz::run(void* data, size_t data_len)
 
 	vcpu->set_regs(regs);
 
-	mem_convert converter(mem, mem_size, entry_point);
-
 	/* Run the CPU */
 	for (;;)
 	{
@@ -240,13 +236,13 @@ int alcatraz::run(void* data, size_t data_len)
 					kvm_regs regs;
 					vcpu->get_regs(regs);
 
-					intptr_t space = converter.space_at(regs.rdi);
+					intptr_t space = mem_converter->space_at(regs.rdi);
 					if (space < 0)
 					{
 						throw std::overflow_error("VM tried tried to access out-of-bound memory");
 					}
 
-					void* data = converter.data_ptr_at<void*>(regs.rdi);
+					void* data = mem_converter->data_ptr_at<void*>(regs.rdi);
 
 					receiver->exec(id, data, space);
 				}

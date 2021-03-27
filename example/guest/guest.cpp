@@ -3,6 +3,7 @@
 #include <memory>
 
 #include <rpcbuf.h>
+#include <klib.h>
 
 #include "../input_data.h"
 
@@ -58,6 +59,19 @@ protected:
 	}
 };
 
+static dispatcher d;
+sender_test st(d);
+
+extern "C"
+{
+	int puts(const char* s);
+}
+
+int puts(const char* s)
+{
+	return st.write(1, s, strlen(s));
+}
+
 class A_CLASS_WITH_A_CONSTRUCTOR
 {
 public:
@@ -65,7 +79,7 @@ public:
 	{
 		dispatcher d;
 		sender_test st(d);
-		st.puts((char*) "Constructive motherfucker\n");
+		puts((char*) "Constructive motherfucker\n");
 //		st.putc(c);
 //		st.putc('\n');
 //		c = 'B';
@@ -75,9 +89,9 @@ public:
 	{
 		dispatcher d;
 		sender_test st(d);
-		st.puts((char*) "bla2: \"");
+		puts((char*) "bla2: \"");
 		st.putc(c);
-		st.puts("\"\n");
+		puts("\"\n");
 	}
 
 	char c = 'D';
@@ -92,26 +106,25 @@ volatile static int abla = 42;
 extern void* _data_end;
 extern void* _code_end;
 
-dispatcher d;
-sender_test st(d);
-
 int guest_main(void* data)
 {
 	input_data* args = (input_data*) data;
 
-	st.puts("args.a: ");
+	puts("Hello world!\n");
+
+	puts("args.a: ");
 	st.pdint(args->a);
 	st.putc('\n');
-	st.puts("args.b: ");
+	puts("args.b: ");
 	st.pdint(args->b);
 	st.putc('\n');
 
 
-	st.puts("_code_end: ");
+	puts("_code_end: ");
 	st.pxint((uint64_t) &_code_end);
 	st.putc('\n');
 
-	st.puts("_data_end: ");
+	puts("_data_end: ");
 	st.pxint((uint64_t) &_data_end);
 	st.putc('\n');
 
@@ -131,7 +144,7 @@ int guest_main(void* data)
 	{
 		if (*((uint64_t*) i) != (uint64_t) ( i * 3))
 		{
-			st.puts("It's fucked\n");
+			puts("It's fucked\n");
 			return -1;
 		}
 	}

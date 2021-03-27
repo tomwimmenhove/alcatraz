@@ -3,7 +3,7 @@ $(shell mkdir -p $(DEPDIR) >/dev/null)
 DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
 POSTCOMPILE = @mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d && touch $@
 
-INCLUDEDIRS = -I../../rpcbuf/src/
+INCLUDEDIRS = -I../../rpcbuf/src/ -I../../src/guest/
 DEBUGFLAGS = -ggdb -DDEBUG -fstack-protector-all
 CPPFLAGS = $(DEBUGFLAGS) $(INCLUDEDIRS) -O2 -std=c++17 -fno-threadsafe-statics -fstack-protector-all -nostdlib -ffreestanding -lgcc -mcmodel=kernel -fno-pic -ffunction-sections -fdata-sections -Wl,gc-sections -fno-exceptions -fno-rtti -fno-use-cxa-atexit $(DEPFLAGS)
 LDFLAGS = -T ../../src/guest/linker.ld

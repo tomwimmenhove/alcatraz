@@ -11,7 +11,12 @@ public:
     { }
 
     intptr_t space_at(uint64_t address)
-    {   
+    {
+		if (address < base_offset)
+		{
+			return -1;
+		}
+
         return mem_size - address + base_offset;
     }
 
@@ -20,6 +25,12 @@ public:
     {   
         return (T) (address - base_offset + mem);
     }
+
+    template<typename T>
+	T convert_to_host(T guest_ptr)
+	{
+		return data_ptr_at<T>((uint64_t) guest_ptr);
+	}
 
 private:
     uint64_t mem;

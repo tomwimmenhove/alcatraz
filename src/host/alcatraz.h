@@ -2,8 +2,9 @@
 #define ALCATRAZ_H
 
 #include <memory>
-
 #include <kvmpp.h>
+
+#include "mem_convert.h"
 
 class alcatraz
 {
@@ -11,7 +12,8 @@ public:
 	alcatraz(uint64_t mem_size, const void* vm_code, size_t vm_code_size);
 	
 	void set_receiver(std::unique_ptr<call_receiver>&& receiver);
-	void* get_mem();
+	inline void* get_mem() { return mem; }
+	inline mem_convert& get_mem_converter() { return *mem_converter; }
 
 	int run(void* data = nullptr, size_t data_len = 0);
 
@@ -39,6 +41,7 @@ private:
 	size_t mem_pages_start;
 	std::unique_ptr<kvm_machine> machine;
 	std::unique_ptr<call_receiver> receiver;
+	std::unique_ptr<mem_convert> mem_converter;
 };
 
 #endif /* ALCATRAZ_H */

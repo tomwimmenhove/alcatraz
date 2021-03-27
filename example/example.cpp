@@ -1,5 +1,6 @@
 #include <string.h>
 #include <iostream>
+#include <unistd.h>
 
 #include "rpcbuf.h"
 #include "call_in_definitions.h"
@@ -13,22 +14,37 @@ class receiver_test : public call_receiver
 #include "call_declarations.h"
 
 public:
-	receiver_test(void* mem) : CALL_OUT_INIT, mem(mem)
+	receiver_test(alcatraz* box) : CALL_OUT_INIT, box(box)
 {   
 	setup();
 }
 
 private:
-	double foo(int x, float y, double z) { return x + y + z; }
-	int foo2(int x, float y, double z) { return (int) (x + y + z); }
-	void bar() { std::cout << "Hello world\n"; }
 	void putc(char c) { std::cout << c; }
-	void puts(const char* s) { std::cout << (&(((char*) mem)[(intptr_t) s - (2 << 20)])); }
 	void dint(uint64_t x) { std::cout << "Debug int: " << std::dec << x << " (0x" << std::hex << x << ")\n"; }
 	void pxint(uint64_t x) { std::cout << std::hex << x; }
 	void pdint(uint64_t x) { std::cout << std::dec << x; }
+	size_t write(int fd, const void *buf, size_t count)
+	{
+		if (fd < 1 || fd > 2)
+		{
+			return -1;
+		}
 
-	void* mem;
+		auto& mem_converter = box->get_mem_converter();
+		intptr_t space = mem_converter.space_at((uint64_t) buf);
+		if (space < 0 || space < count)
+		{   
+			throw std::overflow_error("VM tried tried to access out-of-bound memory");
+		}
+
+		::write(fd, mem_converter.convert_to_host(buf), count);
+
+		return 0;
+	}
+
+
+	alcatraz* box;
 };
 
 int main()
@@ -36,7 +52,7 @@ int main()
 	extern const unsigned char guest64[], guest64_end[];
 	alcatraz a(2048 * 1024 * 10, guest64, guest64_end-guest64);
 
-	auto rt = std::make_unique<receiver_test>(a.get_mem());
+	auto rt = std::make_unique<receiver_test>(&a);
 
 	a.set_receiver(std::move(rt));
 

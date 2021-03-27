@@ -16,12 +16,9 @@
  */
 
 DEFINE_CALL_START;
-//DEFINE_CALL(foo, double(int, float, double));
-//DEFINE_CALL(foo2, int(int, int, int));
-//DEFINE_CALL(bar, void());
 DEFINE_CALL(putc, void(char));
-DEFINE_CALL(puts, void(const char*));
 DEFINE_CALL(dint, void(uint64_t));
 DEFINE_CALL(pxint, void(uint64_t));
 DEFINE_CALL(pdint, void(uint64_t));
+DEFINE_CALL(write, size_t(int, const void*, size_t));
 DEFINE_CALL_END;
