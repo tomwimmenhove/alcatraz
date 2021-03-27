@@ -4,6 +4,7 @@
 
 #include <rpcbuf.h>
 #include <klib.h>
+#include <guest_dispatcher.h>
 
 #include "../input_data.h"
 
@@ -36,31 +37,14 @@ void operator delete [](void*, long unsigned int) { }
 class sender_test : call_sender
 {
 	public:
-		sender_test(call_dispatcher& dispatcher)
-			: call_sender(dispatcher)
+		sender_test(call_dispatcher& guest_dispatcher)
+			: call_sender(guest_dispatcher)
 		{ }
 
 	#include "../call_declarations.h"
 };
 
-class dispatcher : public call_dispatcher
-{
-public:
-	virtual ~dispatcher()  { }
-
-protected:
-	void exec(size_t id, void* mem, size_t, size_t)
-	{
-		uint16_t port = 0x42;
-		asm("mov %0, %%rdi\n"
-			"outl %1, %2"
-			: /* empty */
-			: "r" (mem), "a" ((uint32_t) id), "Nd" (port)
-			: "memory", "rdi");
-	}
-};
-
-static dispatcher d;
+static guest_dispatcher d;
 sender_test st(d);
 
 extern "C"
@@ -78,7 +62,7 @@ class A_CLASS_WITH_A_CONSTRUCTOR
 public:
 	A_CLASS_WITH_A_CONSTRUCTOR(int)
 	{
-		dispatcher d;
+		guest_dispatcher d;
 		sender_test st(d);
 		puts((char*) "Constructive motherfucker\n");
 //		st.putc(c);
@@ -88,7 +72,7 @@ public:
 
 	void bla()
 	{
-		dispatcher d;
+		guest_dispatcher d;
 		sender_test st(d);
 		puts((char*) "bla2: \"");
 		st.putc(c);
