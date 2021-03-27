@@ -19,8 +19,8 @@ void *operator new(size_t size);
 void operator delete(void *) throw();
 void operator delete[](void *) throw();
 
-void operator delete(void*, long unsigned int) { }
-void operator delete [](void*, long unsigned int) { }
+void operator delete(void*, long unsigned int);
+void operator delete [](void*, long unsigned int);
 
 #include <call_out_definitions.h>
 

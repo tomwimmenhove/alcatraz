@@ -55,3 +55,6 @@ void operator delete[](void* p)
 	free(p);
 }
 
+void operator delete(void*, long unsigned int) { }
+void operator delete [](void*, long unsigned int) { }
+
