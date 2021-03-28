@@ -8,30 +8,6 @@
 
 #include "../input_data.h"
 
-extern void* heap_start;
-static uintptr_t new_p;
-
-void *operator new(size_t size)
-{
-	uintptr_t p = new_p;
-	new_p += size;
-
-	return (void*) p;
-}
-
-void *operator new[](size_t size)
-{
-	uintptr_t p = new_p;
-	new_p += size;
-
-	return (void*) p;
-}
-
-void operator delete(void *) throw() { }
-void operator delete[](void *) throw() { }
-void operator delete(void*, long unsigned int) { }
-void operator delete [](void*, long unsigned int) { }
-
 #include <call_out_definitions.h>
 
 class sender_test : call_sender
@@ -93,8 +69,6 @@ extern void* _code_end;
 
 int guest_main(void* data)
 {
-	new_p = (intptr_t) heap_start;
-
 	input_data* args = (input_data*) data;
 
 	puts("Hello world!\n");
@@ -115,13 +89,23 @@ int guest_main(void* data)
 	st.pxint((uint64_t) &_data_end);
 	st.putc('\n');
 
-	puts("heap_start: ");
-	st.pxint((uint64_t) heap_start);
+	void* p1 = malloc(1000);
+	void* p2 = malloc(1000);
+	free(p1);
+	void* p3 = malloc(1000);
+
+	puts("p1: ");
+	st.pxint((uint64_t) p1);
 	st.putc('\n');
 
-	puts("&a: ");
-	st.pxint((uint64_t) &a);
+	puts("p2: ");
+	st.pxint((uint64_t) p2);
 	st.putc('\n');
+
+	puts("p3: ");
+	st.pxint((uint64_t) p3);
+	st.putc('\n');
+
 
 	/* Crude memcheck */
 	uint64_t rsp;

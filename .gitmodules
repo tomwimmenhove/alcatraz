@@ -4,3 +4,6 @@
 [submodule "rpcbuf"]
 	path = rpcbuf
 	url = https://github.com/tomwimmenhove/rpcbuf
+[submodule "newlib"]
+	path = newlib
+	url = https://github.com/tomwimmenhove/newlib

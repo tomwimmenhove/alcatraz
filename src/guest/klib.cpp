@@ -1,16 +1,89 @@
 /* Taken from https://github.com/tomwimmenhove/toyos */
 
 #include "klib.h"
-#include "malloc.h"
+
+#include <malloc.h>
 
 /* Horrible unoptimized shit. */
 
 extern "C" 
 {
 	void __attribute__((noreturn)) __assert_func(const char* file, int line, const char* fn, const char* assertion);
-	void __attribute__((noreturn)) __stack_chk_fail(void);
-	void __cxa_pure_virtual();
+	intptr_t sbrk(ptrdiff_t heap_incr);
 };
+
+extern void* heap_start;
+
+extern "C" 
+{
+
+void _exit(int status)
+{
+}
+
+int64_t write(int fd, const void *buf, size_t count)
+{
+}
+
+int kill(int pid, int sig)
+{
+}
+
+int getpid(void)
+{
+}
+
+}
+
+void *operator new(size_t size)
+{
+	return malloc(size);
+}
+
+void *operator new[](size_t size)
+{
+	return malloc(size);
+}
+
+void operator delete(void* p) throw()
+{
+	free(p);
+}
+
+void operator delete[](void* p) throw()
+{
+	free(p);
+}
+
+void operator delete(void*, long unsigned int) { }
+void operator delete [](void*, long unsigned int) { }
+
+intptr_t sbrk(ptrdiff_t heap_incr)
+{
+	static intptr_t heap_end = 0;
+
+	intptr_t prev_heap_end;
+	intptr_t new_heap_end;
+
+	if(heap_end == 0)
+	{
+		heap_end = (intptr_t) heap_start;
+	}
+
+	prev_heap_end = heap_end;
+	new_heap_end = prev_heap_end + heap_incr;
+
+	//	if(new_heap_end >= end_of_mem)
+	//	{
+	//		errno = ENOMEM;
+	//
+	//		return -1;
+	//	}
+
+	heap_end = new_heap_end;
+
+	return prev_heap_end;
+}
 
 namespace std
 {
@@ -80,15 +153,6 @@ int memcmp(const void *s1, const void *s2, size_t n)
 	return 0;
 }
 
-size_t strlen(const char *s)
-{
-	size_t len = 0;
-	while (*s++)
-		len++;
-
-	return len;
-}
-
 int strncmp(const char *s1, const char *s2, size_t n)
 {
 	while (*s1 && *s2 && n--)
@@ -150,13 +214,5 @@ void __attribute__((noreturn)) __assert_func(const char* file, int line, const c
 		for(;;);
 //	con << file << ':' << line << ':' << fn << ": Assertion '" << assertion << "' failed.\n";
 //	panic("Assertion failed\n");
-}
-
-uintptr_t __stack_chk_guard = 0x42dead42beefface;
- 
-void __attribute__((noreturn)) __stack_chk_fail(void)
-{
-		for(;;);
-	//panic("Stack smash detected");
 }
 

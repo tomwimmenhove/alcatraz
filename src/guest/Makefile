@@ -3,7 +3,7 @@ $(shell mkdir -p $(DEPDIR) >/dev/null)
 DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
 POSTCOMPILE = @mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d && touch $@
 
-INCLUDEDIRS = -I../../rpcbuf/src/
+INCLUDEDIRS = -I../../rpcbuf/src/ -I../../newlib/newlib/libc/include/
 DEBUGFLAGS = -ggdb -DDEBUG -fstack-protector-all
 CPPFLAGS = $(DEBUGFLAGS) $(INCLUDEDIRS) -O2 -std=c++17 -fno-threadsafe-statics -fstack-protector-all -nostdlib -ffreestanding -lgcc -mcmodel=kernel -fno-pic -ffunction-sections -fdata-sections -Wl,gc-sections -fno-exceptions -fno-rtti -fno-use-cxa-atexit $(DEPFLAGS)
 ARFLAGS =  -rcs
@@ -30,7 +30,10 @@ all: libguest.a
 	$(POSTCOMPILE)
 
 libguest.a: $(OBJS)
-	$(AR) $(ARFLAGS) $@ $(OBJS)
+	mkdir -p tmp
+	cd tmp ; ar -x ../../../newlib/build/libc.a
+	$(AR) $(ARFLAGS) $@ tmp/*.o $(OBJS)
+	rm -rf tmp
 
 clean:
 	rm -rf *.o *.a
