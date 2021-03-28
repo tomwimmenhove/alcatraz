@@ -3,7 +3,9 @@
 
 #include <rpcbuf.h>
 #include <klib.h>
-#include <guest_dispatcher.h>
 #include <call_out_definitions.h>
+
+#include "guest_dispatcher.h"
+#include "dummy.h"
 
 #endif /* GUEST_H */

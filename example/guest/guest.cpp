@@ -3,9 +3,13 @@
 #include <memory>
 #include <stdio.h>
 
+#define GUEST_CUSTOM_WRITE
 #include <guest.h>
 
 #include "../input_data.h"
+
+/* This macro expands the the implementations or read/write/close etc, unless a custom functionis defined */
+DEFINE_GUEST_DUMMY_CALLS
 
 class sender_test : call_sender
 {
@@ -20,16 +24,12 @@ class sender_test : call_sender
 static guest_dispatcher d;
 sender_test st(d);
 
+/* Custom write() function */
 extern "C" {
-int puts(const char* s);
-
-int64_t read(int fd, const void *buf, size_t count) { return 0; }
-int close(int) { return 0; }
-int64_t write(int fd, const void *buf, size_t count)
-{
-	return st.write(fd, buf, count);
-}
-
+	int64_t write(int fd, const void *buf, size_t count)
+	{
+		return st.write(fd, buf, count);
+	}
 }
 
 class construction_test_class
