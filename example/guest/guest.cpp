@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <memory>
 #include <stdio.h>
+#include <cmath>
 
 #define GUEST_CUSTOM_WRITE
 #include <guest.h>
@@ -74,6 +75,9 @@ int guest_main(void* data)
 	printf("p1: %p\n", p1);
 	printf("p2: %p\n", p2);
 	printf("p3: %p\n", p3);
+
+	float x = 42;
+	printf("The squre root of %g is %g\n", x, sqrt(x));
 
 	/* Crude memcheck */
 	uint64_t rsp;

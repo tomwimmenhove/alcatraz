@@ -31,7 +31,7 @@ all: libguest.a
 
 libguest.a: $(OBJS)
 	mkdir -p tmp
-	cd tmp ; ar -x ../../../newlib/build/libc.a
+	cd tmp ; ar -x ../../../newlib/build/libc.a ; ar -x ../../../newlib/build/libm.a
 	$(AR) $(ARFLAGS) $@ tmp/*.o $(OBJS)
 	rm -rf tmp
 
