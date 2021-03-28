@@ -178,10 +178,10 @@ void alcatraz::print_regs(kvm_regs& regs)
 	print_reg("rflags", regs.rflags);
 }
 
-int alcatraz::run(void* data, size_t data_len, size_t drop_stack)
+int alcatraz::run(void* data, size_t data_len, int cpu_id, size_t drop_stack)
 {
 	/* Create a virtual CPU instance on the virtual machine */
-	auto vcpu = machine->create_vcpu();
+	auto vcpu = machine->create_vcpu(cpu_id);
 
 	/* Setup the special registers */
 	struct kvm_sregs sregs;

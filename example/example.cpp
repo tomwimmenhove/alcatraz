@@ -60,5 +60,5 @@ int main()
 	args.a = 42;
 	args.b = 43;
 
-	return box.run(args);
+	box.run(args);
 }
