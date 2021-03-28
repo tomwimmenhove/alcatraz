@@ -2,7 +2,7 @@
 
 extern "C"
 {
-	void _start(void* data, void* user_mem);
+	void _start(void* data);
 }
 
 int guest_main(void* data);
@@ -25,12 +25,8 @@ static void custom_preinit(void) { init_range(__preinit_array_start, __preinit_a
 static void custom_init(void) { init_range(__init_array_start, __init_array_end); }
 static void custom_fini(void) { init_range(__fini_array_start, __fini_array_end); }
 
-void* heap_start;
-
-void __attribute__((noreturn)) __attribute__((section(".start"))) _start(void* data, void* user_mem)
+void __attribute__((noreturn)) __attribute__((section(".start"))) _start(void* data)
 {
-	heap_start = (void*) ((((uintptr_t) user_mem) + 4095) & (~4095));
-
 	uint16_t fpu_contorl;
 	asm volatile("fninit\n"
 			     "fstcw %0\n"

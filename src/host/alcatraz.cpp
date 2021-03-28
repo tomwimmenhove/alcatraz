@@ -205,9 +205,6 @@ int alcatraz::run(void* data, size_t data_len)
 		memcpy((void*) ((uintptr_t) mem + mem_size - data_len), data, data_len);
 	}
 
-	/* Second argument points to the starts of usable empty memory */
-	regs.rsi = entry_point + vm_code_size;
-
 	vcpu->set_regs(regs);
 
 	/* Run the CPU */

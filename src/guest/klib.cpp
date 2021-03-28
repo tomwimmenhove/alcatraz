@@ -6,7 +6,6 @@
 
 /* Horrible unoptimized shit. */
 
-extern void* heap_start;
 extern "C" {
 
 void __attribute__((noreturn)) __assert_func(const char* file, int line, const char* fn, const char* assertion);
@@ -54,6 +53,7 @@ void operator delete[](void* p) throw()
 void operator delete(void*, long unsigned int) { }
 void operator delete [](void*, long unsigned int) { }
 
+extern void* _data_end;
 intptr_t sbrk(ptrdiff_t heap_incr)
 {
 	static intptr_t heap_end = 0;
@@ -63,7 +63,7 @@ intptr_t sbrk(ptrdiff_t heap_incr)
 
 	if(heap_end == 0)
 	{
-		heap_end = (intptr_t) heap_start;
+		heap_end = (intptr_t) &_data_end;
 	}
 
 	prev_heap_end = heap_end;
