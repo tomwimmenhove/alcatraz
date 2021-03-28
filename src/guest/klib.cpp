@@ -6,32 +6,28 @@
 
 /* Horrible unoptimized shit. */
 
-extern "C" 
-{
-	void __attribute__((noreturn)) __assert_func(const char* file, int line, const char* fn, const char* assertion);
-	intptr_t sbrk(ptrdiff_t heap_incr);
-};
-
 extern void* heap_start;
+extern "C" {
 
-extern "C" 
-{
+void __attribute__((noreturn)) __assert_func(const char* file, int line, const char* fn, const char* assertion);
+intptr_t sbrk(ptrdiff_t heap_incr);
 
 void _exit(int status)
 {
+	asm("hlt" :: "a" (status) : "memory");
 }
 
-int64_t write(int fd, const void *buf, size_t count)
-{
-}
+#ifdef DUMMY_IO
+int64_t write(int fd, const void *buf, size_t count) { return 0; }
+int64_t read(int fd, void *buf, size_t count) { return 0; }
+int close(int fd) { return 0; }
+#endif
 
-int kill(int pid, int sig)
-{
-}
-
-int getpid(void)
-{
-}
+int kill(int pid, int sig) { return 0; }
+int getpid(void) { return 0; }
+int fstat(int fd, struct stat *statbuf) { return 0; }
+int isatty(int fd) { return 0; }
+int64_t lseek(int fd, int64_t offset, int whence) { return 0; }
 
 }
 
@@ -100,6 +96,7 @@ namespace std
 	}
 }
 
+#if 0
 void *memset(void *s, int c, size_t n)
 {
 	uint8_t* p = (uint8_t*) s;
@@ -202,6 +199,7 @@ char *index(const char *s, int c)
 
 	return nullptr;
 }
+#endif
 
 void __cxa_pure_virtual()
 {

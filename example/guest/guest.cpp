@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <stdio.h>
 
 #include <rpcbuf.h>
 #include <klib.h>
@@ -23,14 +24,16 @@ class sender_test : call_sender
 static guest_dispatcher d;
 sender_test st(d);
 
-extern "C"
+extern "C" {
+int puts(const char* s);
+
+int64_t read(int fd, const void *buf, size_t count) { return 0; }
+int close(int) { return 0; }
+int64_t write(int fd, const void *buf, size_t count)
 {
-	int puts(const char* s);
+	return st.write(fd, buf, count);
 }
 
-int puts(const char* s)
-{
-	return st.write(1, s, strlen(s));
 }
 
 class A_CLASS_WITH_A_CONSTRUCTOR
@@ -40,7 +43,7 @@ public:
 	{
 		guest_dispatcher d;
 		sender_test st(d);
-		puts((char*) "Constructive motherfucker\n");
+		puts("Constructive motherfucker\n");
 //		st.putc(c);
 //		st.putc('\n');
 //		c = 'B';
@@ -71,41 +74,21 @@ int guest_main(void* data)
 {
 	input_data* args = (input_data*) data;
 
-	puts("Hello world!\n");
+	puts("Hello world!");
 
-	puts("args.a: ");
-	st.pdint(args->a);
-	st.putc('\n');
-	puts("args.b: ");
-	st.pdint(args->b);
-	st.putc('\n');
-
-
-	puts("_code_end: ");
-	st.pxint((uint64_t) &_code_end);
-	st.putc('\n');
-
-	puts("_data_end: ");
-	st.pxint((uint64_t) &_data_end);
-	st.putc('\n');
+	printf("args.a: %d\n", args->a);
+	printf("args.b: %d\n", args->b);
+	printf("_code_end: %p\n", &_code_end);
+	printf("_data_end: %p\n", &_data_end);
 
 	void* p1 = malloc(1000);
 	void* p2 = malloc(1000);
 	free(p1);
 	void* p3 = malloc(1000);
 
-	puts("p1: ");
-	st.pxint((uint64_t) p1);
-	st.putc('\n');
-
-	puts("p2: ");
-	st.pxint((uint64_t) p2);
-	st.putc('\n');
-
-	puts("p3: ");
-	st.pxint((uint64_t) p3);
-	st.putc('\n');
-
+	printf("p1: %p\n", p1);
+	printf("p2: %p\n", p2);
+	printf("p3: %p\n", p3);
 
 	/* Crude memcheck */
 	uint64_t rsp;
@@ -123,12 +106,10 @@ int guest_main(void* data)
 	{
 		if (*((uint64_t*) i) != (uint64_t) ( i * 3))
 		{
-			puts("It's fucked\n");
+			puts("It's fucked");
 			return -1;
 		}
 	}
-
-//	*(int*) (2048 * 1024 * 2 + 4096 * 3 - 4) = 42;
 
 	return 42;
 }
