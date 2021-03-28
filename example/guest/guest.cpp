@@ -111,5 +111,5 @@ int guest_main(void* data)
 		}
 	}
 
-	return 42;
+	return 0;
 }

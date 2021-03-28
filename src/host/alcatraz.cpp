@@ -219,7 +219,7 @@ int alcatraz::run(void* data, size_t data_len)
 				kvm_regs regs;
 				vcpu->get_regs(regs);
 
-				return run->exit_reason;
+				return regs.rax;
 			}
 
 			case KVM_EXIT_IO:
@@ -249,14 +249,15 @@ int alcatraz::run(void* data, size_t data_len)
 				}
 				else
 				{
-					std::cerr << "Unknown IO error. Port=" << run->io.port
+					std::stringstream ss;
+					ss << "Unknown IO error. Port=" << run->io.port
 						      << ", size=" << (run->io.size * 8)
 							  << "bits, direction:" << (run->io.direction == KVM_EXIT_IO_OUT
 									  ? "out"
 									  : "in")
 							  << '\n';
 
-					return run->exit_reason;
+					throw std::invalid_argument(ss.str());
 				}
 				break;
 			}
@@ -264,12 +265,14 @@ int alcatraz::run(void* data, size_t data_len)
 			default:
 			{
 				auto regs = vcpu->get_regs();
-				std::cerr << "VCPU exited with reason: " << run->exit_reason
-					      << ", rip=" << ((void*) regs.rip)<< '\n';
-
+#ifdef DEBUG
 				print_regs(regs);
+#endif
+				std::stringstream ss;
+				ss << "Unexpected VCPU exist reason: " << run->exit_reason
+				   << ", rip=" << ((void*) regs.rip)<< '\n';
 
-				return run->exit_reason;
+				throw std::invalid_argument(ss.str());
 			}
 		}
 	}

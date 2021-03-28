@@ -60,7 +60,5 @@ int main()
 	args.a = 42;
 	args.b = 43;
 
-	box.run(&args, sizeof(input_data));
-
-	return 0;
+	return box.run(args);
 }

@@ -17,6 +17,12 @@ public:
 
 	int run(void* data = nullptr, size_t data_len = 0);
 
+	template<typename T>
+	int run(T&& data)
+	{
+		return run((void*) &data, sizeof(T));
+	}
+
 	virtual ~alcatraz();
 
 private:
