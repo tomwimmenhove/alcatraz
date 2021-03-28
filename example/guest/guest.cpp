@@ -3,13 +3,9 @@
 #include <memory>
 #include <stdio.h>
 
-#include <rpcbuf.h>
-#include <klib.h>
-#include <guest_dispatcher.h>
+#include <guest.h>
 
 #include "../input_data.h"
-
-#include <call_out_definitions.h>
 
 class sender_test : call_sender
 {
@@ -36,36 +32,25 @@ int64_t write(int fd, const void *buf, size_t count)
 
 }
 
-class A_CLASS_WITH_A_CONSTRUCTOR
+class construction_test_class
 {
 public:
-	A_CLASS_WITH_A_CONSTRUCTOR(int)
+	construction_test_class(int x)
+		: x(x)
 	{
-		guest_dispatcher d;
-		sender_test st(d);
-		puts("Constructive motherfucker\n");
-//		st.putc(c);
-//		st.putc('\n');
-//		c = 'B';
+		printf("Constructor called with arg %d\n", x);
 	}
 
-	void bla()
+	virtual ~construction_test_class()
 	{
-		guest_dispatcher d;
-		sender_test st(d);
-		puts((char*) "bla2: \"");
-		st.putc(c);
-		puts("\"\n");
+		printf("Destructor of %d\n", x);
 	}
 
-	char c = 'D';
+private:
+	int x;
 };
 
-extern uint64_t init_array;
-
-static A_CLASS_WITH_A_CONSTRUCTOR a(42);
-
-volatile static int abla = 42;
+std::unique_ptr<construction_test_class> a = std::make_unique<construction_test_class>(42);
 
 extern void* _data_end;
 extern void* _code_end;

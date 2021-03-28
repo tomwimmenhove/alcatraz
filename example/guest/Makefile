@@ -31,8 +31,7 @@ guest.elf: guest.o ../../src/guest/libguest.a
 	make -C ../../src/guest/
 
 guest.img: guest.elf
-	# XXX: Is the section flag correct?
-	$(OBJCOPY) -O binary --set-section-flags '.bss*'=alloc,load,contents $< $@
+	$(OBJCOPY) -O binary $< $@
 
 guest.img.o: guest.img
 	$(LD) -b binary -r $< -o $@
