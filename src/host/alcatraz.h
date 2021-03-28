@@ -15,12 +15,12 @@ public:
 	inline void* get_mem() { return mem; }
 	inline mem_convert& get_mem_converter() { return *mem_converter; }
 
-	int run(void* data = nullptr, size_t data_len = 0);
+	int run(void* data = nullptr, size_t data_len = 0, size_t drop_stack = 0);
 
 	template<typename T>
-	int run(T&& data)
+	int run(T&& data, size_t drop_stack = 0)
 	{
-		return run((void*) &data, sizeof(T));
+		return run((void*) &data, sizeof(T), drop_stack);
 	}
 
 	virtual ~alcatraz();
