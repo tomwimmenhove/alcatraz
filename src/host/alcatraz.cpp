@@ -194,7 +194,7 @@ void alcatraz::print_regs(kvm_regs& regs)
 	print_reg("rflags", regs.rflags);
 }
 
-int alcatraz::run(void* data, size_t data_len, int cpu_id, size_t drop_stack)
+std::unique_ptr<kvm_vcpu> alcatraz::setup_vcpu(void* data, size_t data_len, int cpu_id, size_t drop_stack)
 {
 	/* Create a virtual CPU instance on the virtual machine */
 	auto vcpu = machine->create_vcpu(cpu_id);
@@ -223,6 +223,11 @@ int alcatraz::run(void* data, size_t data_len, int cpu_id, size_t drop_stack)
 
 	vcpu->set_regs(regs);
 
+	return std::move(vcpu);
+}
+
+int alcatraz::run(kvm_vcpu* vcpu)
+{
 	/* Run the CPU */
 	for (;;)
 	{

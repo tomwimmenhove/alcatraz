@@ -26,7 +26,7 @@ makeguest:
 	$(POSTCOMPILE)
 
 example: example.o guest/payload.o ../kvmpp/src/kvmpp.o ../src/host/libhost.a
-	$(CPP) example.o ../kvmpp/src/kvmpp.o guest/payload.o -o example -L ../src/host/ -lhost
+	$(CPP) example.o ../kvmpp/src/kvmpp.o guest/payload.o -o example -L ../src/host/ -lhost -lpthread
 
 clean:
 	rm -f *.o

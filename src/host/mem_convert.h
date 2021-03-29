@@ -26,14 +26,14 @@ public:
         : mem((uint64_t) mem), mem_size(mem_size), base_offset(base_offset)
     { }
 
-    intptr_t space_at(uint64_t address)
+    intptr_t space_at(uint64_t guest_address)
     {
-		if (address < base_offset)
+		if (guest_address < base_offset)
 		{
 			return -1;
 		}
 
-        return mem_size - address + base_offset;
+        return mem_size - guest_address + base_offset;
     }
 
     template<typename T>

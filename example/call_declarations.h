@@ -21,4 +21,11 @@ DEFINE_CALL(dint, void(uint64_t));
 DEFINE_CALL(pxint, void(uint64_t));
 DEFINE_CALL(pdint, void(uint64_t));
 DEFINE_CALL(write, size_t(int, const void*, size_t));
+
+DEFINE_CALL(set_msg_pump_ready, void(bool));
+
+DEFINE_CALL(set_test_address, void(uintptr_t fn));
+
+DEFINE_CALL(wait, void());
+
 DEFINE_CALL_END;

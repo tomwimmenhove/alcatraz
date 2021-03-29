@@ -18,11 +18,23 @@
 #include <iostream>
 #include <unistd.h>
 
+#include <thread> 
+#include <mutex>
+#include <condition_variable> 
+
 #include "rpcbuf.h"
 #include "call_in_definitions.h"
 
 #include "alcatraz.h"
 #include "input_data.h"
+
+std::mutex m;
+std::condition_variable cv;
+bool message_ready = false;
+uintptr_t fn_address;
+std::unique_ptr<kvm_vcpu> vcpu;
+size_t payload_size = 256;
+void *payload = nullptr;
 
 class receiver : public call_receiver
 {
@@ -58,7 +70,84 @@ private:
 		return 0;
 	}
 
+	void set_msg_pump_ready(bool ready) { msg_pump_ready = ready; }
+
+	void set_test_address(uintptr_t address)
+	{
+		fn_address = address;
+	}
+
+	void wait()
+	{
+		std::unique_lock<std::mutex> lk(m);
+		cv.wait(lk, [&] { return message_ready; } );
+		message_ready = false;
+
+		/* Read the guest registers */
+		kvm_regs regs;
+		vcpu->get_regs(regs);
+
+		/* Subtract 128 bytes (red zone) + payload size + room for all GP registers (minus the stack pointer) */
+		size_t size = 128 + sizeof(intptr_t) * 16 + payload_size;
+		regs.rsp -= size;
+
+		/* Find the actuall address (on the host) of the stack on the guest */
+		auto& mem_converter = box->get_mem_converter();
+		intptr_t space = mem_converter.space_at(regs.rsp);
+		if (space < 0 || space < size)
+		{   
+			throw std::overflow_error("VM tried tried to access out-of-bound memory");
+		}
+		uintptr_t* rsp = mem_converter.convert_to_host((uintptr_t*) regs.rsp);
+
+		/* Stack layout:
+		 *
+		 * + ----------------------------+
+		 * | Red zone                    |
+		 * + ----------------------------+
+		 * | Return pointer (Old %rip)   |
+		 * +-----------------------------+
+		 * | All (but %rsp) GP registers |
+		 * +-----------------------------+
+		 * | Payload                     |
+		 * +-----------------------------+ <- %rsp
+		 *
+		 * So, on the guest side where %rip starts to execute, we can now safely
+		 * call a user-fuction. After that we'll have to add %rdi to %rsp (as if
+		 * to pop the payload back from the stack), pop all registers (in the
+		 * order as they're copied below), increase %rsp with another 136 (return
+		 * pointer and 128 bytes for the red-zone) and, finally, jump to the return
+		 * pointer (%rsp - 136)
+		 */
+
+		/* 'push' payload onto stack */
+		if (payload_size && payload)
+		{
+			memcpy(rsp, payload, payload_size);
+		}
+		rsp = (uintptr_t*)((uintptr_t) rsp + payload_size);
+
+		/* Copy all registers to the stack */
+		*rsp++ = regs.r15;	*rsp++ = regs.r14;	*rsp++ = regs.r13;	*rsp++ = regs.r12;
+		*rsp++ = regs.r11;	*rsp++ = regs.r10;	*rsp++ = regs.r9;	*rsp++ = regs.r8;
+		*rsp++ = regs.rdi;	*rsp++ = regs.rsi;	*rsp++ = regs.rbp;	/* rsp skipped */
+		*rsp++ = regs.rbx;	*rsp++ = regs.rdx;	*rsp++ = regs.rcx;	*rsp++ = regs.rax;
+
+		/* Set the current address as return address */
+		*rsp++ = regs.rip;
+
+		/* Finally, set up the function we're about to call */
+		regs.rip = fn_address;		/* Copy the address of the function into the instruction pointer */
+		regs.rdi = regs.rsp;		/* First argument points to the payload */
+		regs.rsi = payload_size;	/* Second argument is the payload size */
+
+		/* Set the altered registers on the guest */
+		vcpu->set_regs(regs);
+	}
+
 	alcatraz* box;
+	bool msg_pump_ready = false;
+//	std::mutex mutex;
 };
 
 extern const unsigned char guest64[], guest64_end[];
@@ -76,5 +165,27 @@ int main()
 	args.a = 42;
 	args.b = 43;
 
-	box.run(args);
+	vcpu = box.setup_vcpu(args);
+
+	std::thread box_thread([&](){
+			box.run(vcpu.get());
+			});
+
+	const char* s = "Hello from the host!\n";
+
+	while (box_thread.joinable())
+	{
+		std::unique_lock<std::mutex> lk(m);
+		message_ready = true;
+
+		payload = (void*) s;
+		payload_size = strlen(s);
+
+		cv.notify_one();
+		lk.unlock();
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+	}
+
+
+	box_thread.join();
 }

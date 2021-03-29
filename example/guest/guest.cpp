@@ -72,11 +72,56 @@ std::unique_ptr<construction_test_class> a = std::make_unique<construction_test_
 extern void* _data_end;
 extern void* _code_end;
 
+extern "C"{
+void test_function(void* payload, size_t payload_size)
+{
+	write(1, payload, payload_size);
+}
+}
+
+asm("asm_test_function:\n"
+	/* All registers have been  pushed onto the stack already at this point */
+
+	"push %rsi\n"
+
+	/* call our function */
+	"callq test_function\n"
+
+	"pop %rsi\n"
+	"add %rsi, %rsp\n" // Payload
+
+	/* Restore all registers */
+	"pop %r15\n"
+	"pop %r14\n"
+	"pop %r13\n"
+	"pop %r12\n"
+	"pop %r11\n"
+	"pop %r10\n"
+	"pop %r9\n"
+	"pop %r8\n"
+	"pop %rdi\n"
+	"pop %rsi\n"
+	"pop %rbp\n"
+	/* .... rsp skipped */
+	"pop %rbx\n"
+	"pop %rdx\n"
+	"pop %rcx\n"
+	"pop %rax\n"
+
+	/* Return */
+	"add $136, %rsp\n"	// 8 bytes for the return address and 128 bytes red-zone
+    "jmp *-136(%rsp)");	// Jump back to the return address
+
+
 int guest_main(void* data)
 {
 	input_data* args = (input_data*) data;
 
 	puts("Hello world!");
+
+	//st.set_test_address((uintptr_t) &test_function);
+	extern uintptr_t asm_test_function;
+	st.set_test_address((uintptr_t) &asm_test_function);
 
 	printf("args.a: %d\n", args->a);
 	printf("args.b: %d\n", args->b);
@@ -94,6 +139,12 @@ int guest_main(void* data)
 
 	float x = 42;
 	printf("The squre root of %g is %g\n", x, sqrt(x));
+
+	while (true)
+	{
+		st.wait();
+//		printf("Got data from host\n");
+	}
 
 	/* Crude memcheck */
 	uint64_t rsp;

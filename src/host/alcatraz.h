@@ -31,13 +31,15 @@ public:
 	inline void* get_mem() { return mem; }
 	inline mem_convert& get_mem_converter() { return *mem_converter; }
 
-	int run(void* data = nullptr, size_t data_len = 0, int cpu_id = 0, size_t drop_stack = 0);
+	std::unique_ptr<kvm_vcpu> setup_vcpu(void* data = nullptr, size_t data_len = 0, int cpu_id = 0, size_t drop_stack = 0);
 
 	template<typename T>
-	int run(T&& data, int cpu_id = 0, size_t drop_stack = 0)
+	std::unique_ptr<kvm_vcpu> setup_vcpu(T&& data, int cpu_id = 0, size_t drop_stack = 0)
 	{
-		return run((void*) &data, sizeof(T), cpu_id, drop_stack);
+		return setup_vcpu((void*) &data, sizeof(T), cpu_id, drop_stack);
 	}
+
+	int run(kvm_vcpu* vcpu);
 
 	virtual ~alcatraz();
 
