@@ -54,9 +54,7 @@ private:
 			throw std::overflow_error("VM tried tried to access out-of-bound memory");
 		}
 
-		::write(fd, mem_converter.convert_to_host(buf), count);
-
-		return 0;
+		return ::write(fd, mem_converter.convert_to_host(buf), count);
 	}
 
 	alcatraz* box;

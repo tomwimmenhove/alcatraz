@@ -5,7 +5,7 @@ POSTCOMPILE = @mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d && touch $@
 
 INCLUDEDIRS = -I ../src/host/ -I ../kvmpp/src/ -I ../rpcbuf/src/
 DEBUGFLAGS = -ggdb -DDEBUG
-CPPFLAGS = $(DEBUGFLAGS) $(INCLUDEDIRS) -std=c++17 $(DEPFLAGS)
+CPPFLAGS = $(DEBUGFLAGS) $(INCLUDEDIRS) -O2 -std=c++17 $(DEPFLAGS)
 LINKFLAGS = -lpthread
 
 CC = gcc
