@@ -6,6 +6,7 @@ POSTCOMPILE = @mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d && touch $@
 INCLUDEDIRS = -I ../src/host/ -I ../kvmpp/src/ -I ../rpcbuf/src/
 DEBUGFLAGS = -ggdb -DDEBUG
 CPPFLAGS = $(DEBUGFLAGS) $(INCLUDEDIRS) -std=c++17 $(DEPFLAGS)
+LINKFLAGS = -lpthread
 
 CC = gcc
 CPP = g++
@@ -26,7 +27,7 @@ makeguest:
 	$(POSTCOMPILE)
 
 example: example.o guest/payload.o ../kvmpp/src/kvmpp.o ../src/host/libhost.a
-	$(CPP) example.o ../kvmpp/src/kvmpp.o guest/payload.o -o example -L ../src/host/ -lhost
+	$(CPP) example.o ../kvmpp/src/kvmpp.o guest/payload.o -o example -L ../src/host/ -lhost $(LINKFLAGS)
 
 clean:
 	rm -f *.o

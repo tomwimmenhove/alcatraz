@@ -44,7 +44,7 @@ static void custom_fini(void) { init_range(__fini_array_start, __fini_array_end)
 void __attribute__((noreturn)) __attribute__((section(".start"))) _start(void* data)
 {
 	uint16_t fpu_contorl;
-	asm volatile("fninit\n"
+	__asm__ volatile("fninit\n"
 			     "fstcw %0\n"
 				 "andw $0xfffa, %0\n" // Generate invalid operation and div-by-zero exceptions
 				 "fldcw %1"

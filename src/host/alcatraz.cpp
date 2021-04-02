@@ -19,6 +19,8 @@
 #include <iomanip>
 #include <sys/mman.h>
 #include <vector>
+#include <mutex>
+#include <condition_variable>
 
 #include "cpudefs.h"
 #include "rpcbuf.h"
@@ -194,7 +196,10 @@ void alcatraz::print_regs(kvm_regs& regs)
 	print_reg("rflags", regs.rflags);
 }
 
-int alcatraz::run(void* data, size_t data_len, int cpu_id, size_t drop_stack)
+int alcatraz::run(void* data, size_t data_len,
+		call_receiver* receiver,
+		alcatraz_dispatcher* dispatcher,
+		int cpu_id, size_t drop_stack)
 {
 	/* Create a virtual CPU instance on the virtual machine */
 	auto vcpu = machine->create_vcpu(cpu_id);
@@ -241,42 +246,74 @@ int alcatraz::run(void* data, size_t data_len, int cpu_id, size_t drop_stack)
 
 			case KVM_EXIT_IO:
 			{
-				if (run->io.direction == KVM_EXIT_IO_OUT
-						&& run->io.port == 0x42)
+				if (run->io.direction == KVM_EXIT_IO_IN)
 				{
-					if (!receiver)
+					/* Callouts from host to guest's call pump */
+					if (run->io.port == 0x43)
 					{
-						continue;
+						if (!dispatcher)
+						{
+							continue;
+						}
+						
+						kvm_regs regs;
+						vcpu->get_regs(regs);
+
+						size_t id = dispatcher->wait(regs.rdi);
+						vcpu->write_io_to_run((int) id);
+						break;
+					}
+				}
+				else if (run->io.direction == KVM_EXIT_IO_OUT)
+				{
+					/* Callout from host to guest has completed */
+					if (run->io.port == 0x43)
+					{
+						if (!dispatcher)
+						{
+							continue;
+						}
+
+						dispatcher->nudge();
+						break;
 					}
 
-					uint32_t id = vcpu->read_io_from_run();
-
-					kvm_regs regs;
-					vcpu->get_regs(regs);
-
-					intptr_t space = mem_converter->space_at(regs.rdi);
-					if (space < 0)
+					/* Callouts from guest to host */
+					if (run->io.port == 0x42)
 					{
-						throw std::overflow_error("VM tried tried to access out-of-bound memory");
+						if (!receiver)
+						{
+							continue;
+						}
+
+						uint32_t id = vcpu->read_io_from_run();
+
+						kvm_regs regs;
+						vcpu->get_regs(regs);
+
+						intptr_t space = mem_converter->space_at(regs.rdi);
+						if (space < 0)
+						{
+							throw std::overflow_error("VM tried tried to access out-of-bound memory");
+						}
+
+						void* data = mem_converter->data_ptr_at<void*>(regs.rdi);
+
+						receiver->exec(id, data, space);
+
+						break;
 					}
-
-					void* data = mem_converter->data_ptr_at<void*>(regs.rdi);
-
-					receiver->exec(id, data, space);
 				}
-				else
-				{
-					std::stringstream ss;
-					ss << "Unknown IO error. Port=" << run->io.port
-						      << ", size=" << (run->io.size * 8)
-							  << "bits, direction:" << (run->io.direction == KVM_EXIT_IO_OUT
-									  ? "out"
-									  : "in")
-							  << '\n';
 
-					throw std::invalid_argument(ss.str());
-				}
-				break;
+				std::stringstream ss;
+				ss << "Unknown IO error. Port=" << run->io.port
+					<< ", size=" << (run->io.size * 8)
+					<< "bits, direction:" << (run->io.direction == KVM_EXIT_IO_OUT
+							? "out"
+							: "in")
+					<< '\n';
+
+				throw std::invalid_argument(ss.str());
 			}
 
 			default:
@@ -284,9 +321,20 @@ int alcatraz::run(void* data, size_t data_len, int cpu_id, size_t drop_stack)
 				auto regs = vcpu->get_regs();
 #ifdef DEBUG
 				print_regs(regs);
+
+				//unsigned char* data = &((unsigned char*) mem)[regs.rip - entry_point];
+				unsigned char* data = (unsigned char*) mem + 0x3b2;
+				std::cout << "Data at rip: ";
+				for(int i = 0; i < 15; i++)
+				{
+					std::cout << std::hex << std::setfill('0') << std::setw(2)
+					          << (unsigned int) data[i] << " ";
+				}
+				std::cout << '\n';
 #endif
 				std::stringstream ss;
 				ss << "Unexpected VCPU exist reason: " << run->exit_reason
+				   << std::hex << std::setfill('0') << std::setw(2)
 				   << ", rip=" << ((void*) regs.rip)<< '\n';
 
 				throw std::invalid_argument(ss.str());
@@ -294,4 +342,79 @@ int alcatraz::run(void* data, size_t data_len, int cpu_id, size_t drop_stack)
 		}
 	}
 }
+
+/* alcatraz_dispatcher */
+
+/* These (wait and nudge) are coupled to the KVM I/O operations */
+size_t alcatraz_dispatcher::wait(uintptr_t guest_address)
+{
+	std::unique_lock<std::mutex> lk(m);
+
+	if (!pump_ready)
+	{
+		pump_ready = true;
+		cv.notify_one();
+	}
+
+	this->guest_address = guest_address;
+	cv.wait(lk, [&] { return message_ready; } );
+	message_ready = false;
+
+	return id;
+}
+
+void alcatraz_dispatcher::nudge()
+{   
+	std::unique_lock<std::mutex> lk(m);
+	response_ready = true;
+	cv.notify_one();
+}
+
+void alcatraz_dispatcher::wait_pump_ready()
+{
+	std::unique_lock<std::mutex> lk(m);
+	cv.wait(lk, [&] { return pump_ready; } );
+}
+
+void alcatraz_dispatcher::exec(size_t id, void* mem, size_t result_size, size_t param_size)
+{   
+	if (!guest_address)
+	{   
+		throw std::invalid_argument("Host called out to the guest, but no call pump was running\n");
+	}
+
+	auto& mem_converter = box->get_mem_converter();
+
+	intptr_t space = mem_converter.space_at((intptr_t) guest_address);
+	if (space < 0 || space < result_size || space < param_size)
+	{   
+		throw std::overflow_error("VM tried tried to access out-of-bound memory");
+	}
+
+	this->id = id;
+
+	auto p = mem_converter.convert_to_host((void*) guest_address);
+
+	{   
+		std::unique_lock<std::mutex> lk(m);
+
+		memcpy(p, mem, param_size);
+
+		/* Wake up the guest's wait() */
+		message_ready = true;
+		cv.notify_one();
+	}
+
+	{   
+		std::unique_lock<std::mutex> lk(m);
+
+		/* Wait for the guest's nudge() */
+		cv.wait(lk, [&] { return response_ready; } );
+		response_ready = false;
+
+		/* Copy the result back */
+		memcpy(mem, p, result_size);
+	}
+}
+
 

@@ -14,14 +14,12 @@
  * You should have received a copy of the GNU General Public License 
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef GUEST_H
-#define GUEST_H
+#ifndef SHARED_DATA_H
+#define SHARED_DATA_H
 
-#include <rpcbuf.h>
-#include <klib.h>
+struct input_data
+{
+	int a, b;
+};
 
-#include "guest_dispatcher.h"
-#include "guest_call_pump.h"
-#include "dummy.h"
-
-#endif /* GUEST_H */
+#endif /* SHARED_DATA_H */

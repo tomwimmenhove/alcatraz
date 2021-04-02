@@ -1,5 +1,5 @@
 /* 
- * This file is part of the alcatraz distribution (https://github.com/tomwimmenhove/alcatraz);
+ * This file is part of the alcatraz distribution (https://github.com/tomwimmenhove/alcatraz).
  * Copyright (c) 2021 Tom Wimmenhove.
  * 
  * This program is free software: you can redistribute it and/or modify  
@@ -14,12 +14,8 @@
  * You should have received a copy of the GNU General Public License 
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef INPUT_DATA_H
-#define INPUT_DATA_H
 
-struct input_data
-{
-	int a, b;
-};
-
-#endif /* INPUT_DATA_H */
+DEFINE_CALL_START(receiver);
+DEFINE_CALL(square, double(double));
+DEFINE_CALL(exit, void(int));
+DEFINE_CALL_END;

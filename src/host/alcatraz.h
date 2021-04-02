@@ -22,6 +22,8 @@
 
 #include "mem_convert.h"
 
+class alcatraz_dispatcher;
+
 class alcatraz
 {
 public:
@@ -31,12 +33,18 @@ public:
 	inline void* get_mem() { return mem; }
 	inline mem_convert& get_mem_converter() { return *mem_converter; }
 
-	int run(void* data = nullptr, size_t data_len = 0, int cpu_id = 0, size_t drop_stack = 0);
+	int run(void* data = nullptr, size_t data_len = 0,
+			call_receiver* receiver = nullptr,
+			alcatraz_dispatcher* dispatcher = nullptr,
+			int cpu_id = 0, size_t drop_stack = 0);
 
 	template<typename T>
-	int run(T&& data, int cpu_id = 0, size_t drop_stack = 0)
+	int run(T&& data,
+			call_receiver* receiver = nullptr,
+			alcatraz_dispatcher* dispatcher = nullptr,
+			int cpu_id = 0, size_t drop_stack = 0)
 	{
-		return run((void*) &data, sizeof(T), cpu_id, drop_stack);
+		return run((void*) &data, sizeof(T), receiver, dispatcher, cpu_id, drop_stack);
 	}
 
 	virtual ~alcatraz();
@@ -65,6 +73,35 @@ private:
 	std::unique_ptr<kvm_machine> machine;
 	std::unique_ptr<call_receiver> receiver;
 	std::unique_ptr<mem_convert> mem_converter;
+};
+
+class alcatraz_dispatcher : public call_dispatcher
+{
+public:
+	alcatraz_dispatcher(alcatraz* box)
+		: box(box)
+	{ }
+
+	virtual ~alcatraz_dispatcher() { }
+
+	/* These (wait and nudge) are coupled to the KVM I/O operations */
+	size_t wait(uintptr_t guest_address);
+	void nudge();
+
+	void wait_pump_ready();
+
+protected:
+	void exec(size_t id, void* mem, size_t result_size, size_t param_size);
+
+private:
+	alcatraz* box;
+	std::mutex m;
+	std::condition_variable cv;
+	bool message_ready = false;
+	bool response_ready = false;
+	bool pump_ready = false;
+	intptr_t guest_address = 0;
+	size_t id;
 };
 
 #endif /* ALCATRAZ_H */

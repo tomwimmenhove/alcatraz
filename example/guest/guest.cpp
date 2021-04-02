@@ -23,23 +23,62 @@
 #define GUEST_CUSTOM_WRITE
 #include <guest.h>
 
-#include "../input_data.h"
+#include "../shared_data.h"
 
 /* This macro expands the the implementations or read/write/close etc, unless a custom functionis defined */
 DEFINE_GUEST_DUMMY_CALLS
 
+/* Define a call_sender which allows the guest to call functions implemented on the host */
+#include <call_out_definitions.h>
 class sender_test : call_sender
 {
-	public:
-		sender_test(call_dispatcher& guest_dispatcher)
-			: call_sender(guest_dispatcher)
-		{ }
+public:
+	sender_test(call_dispatcher& guest_dispatcher)
+		: call_sender(guest_dispatcher)
+	{ }
 
-	#include "../call_declarations.h"
+	#include "../guest_callout_declarations.h"
 };
 
 static guest_dispatcher d;
 sender_test st(d);
+
+/* Define a call_receiver which implements calls that the host can call */
+#include "call_in_definitions.h"
+class receiver : public call_receiver
+{
+#include "../host_callout_declarations.h"
+
+public:
+	receiver() : CALL_OUT_INIT
+	{
+		setup();
+		reset();
+	}
+
+	void reset()
+	{
+		stopped = false;
+		exit_code = 0;
+	}
+
+	bool is_stopped() { return stopped; }
+	int get_exit_code() { return exit_code; }
+
+private:
+	/* Methods called from the host */
+	double square(double x) { return x * x; }
+
+	void exit(int code)
+	{
+		exit_code = code;
+		stopped = true;
+	}
+
+private:
+	bool stopped = true;
+	int exit_code = 0;
+};
 
 /* Custom write() function */
 extern "C" {
@@ -49,72 +88,27 @@ extern "C" {
 	}
 }
 
-class construction_test_class
-{
-public:
-	construction_test_class(int x)
-		: x(x)
-	{
-		printf("Constructor called with arg %d\n", x);
-	}
-
-	virtual ~construction_test_class()
-	{
-		printf("Destructor of %d\n", x);
-	}
-
-private:
-	int x;
-};
-
-std::unique_ptr<construction_test_class> a = std::make_unique<construction_test_class>(42);
-
-extern void* _data_end;
-extern void* _code_end;
-
 int guest_main(void* data)
 {
 	input_data* args = (input_data*) data;
 
 	puts("Hello world!");
 
-	printf("args.a: %d\n", args->a);
-	printf("args.b: %d\n", args->b);
-	printf("_code_end: %p\n", &_code_end);
-	printf("_data_end: %p\n", &_data_end);
-
-	void* p1 = malloc(1000);
-	void* p2 = malloc(1000);
-	free(p1);
-	void* p3 = malloc(1000);
-
-	printf("p1: %p\n", p1);
-	printf("p2: %p\n", p2);
-	printf("p3: %p\n", p3);
+	printf("args->a: %d\n", args->a);
+	printf("args->b: %d\n", args->b);
 
 	float x = 42;
 	printf("The squre root of %g is %g\n", x, sqrt(x));
 
-	/* Crude memcheck */
-	uint64_t rsp;
-	asm("mov %%rsp, %0"
-			: "=r" (rsp)
-			:
-			:
-	   );
+	/* Create a call pump */
+	receiver rec;
+	guest_call_pump pump(&rec);
 
-	for (uint64_t i = (uint64_t) &_data_end + 128; i < rsp - 128; i += sizeof(uint64_t))
+	/* Run the call pump until the host calls the stop() method on it */
+	while (!rec.is_stopped())
 	{
-		*((uint64_t*) i) = i * 3;
-	}
-	for (uint64_t i = (uint64_t) &_data_end + 128; i < rsp - 128; i += sizeof(uint64_t))
-	{
-		if (*((uint64_t*) i) != (uint64_t) ( i * 3))
-		{
-			puts("It's fucked");
-			return -1;
-		}
+		pump.do_events();
 	}
 
-	return 0;
+	return rec.get_exit_code();
 }

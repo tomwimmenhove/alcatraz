@@ -1,5 +1,5 @@
 /* 
- * This file is part of the alcatraz distribution (https://github.com/tomwimmenhove/alcatraz).
+ * This file is part of the alcatraz distribution (https://github.com/tomwimmenhove/alcatraz);
  * Copyright (c) 2021 Tom Wimmenhove.
  * 
  * This program is free software: you can redistribute it and/or modify  
@@ -14,11 +14,27 @@
  * You should have received a copy of the GNU General Public License 
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef GUEST_CALL_PUMP_H
+#define GUEST_CALL_PUMP_H
 
-DEFINE_CALL_START(receiver);
-DEFINE_CALL(putc, void(char));
-DEFINE_CALL(dint, void(uint64_t));
-DEFINE_CALL(pxint, void(uint64_t));
-DEFINE_CALL(pdint, void(uint64_t));
-DEFINE_CALL(write, size_t(int, const void*, size_t));
-DEFINE_CALL_END;
+#include <rpcbuf.h>
+#include <cstdint>
+
+class guest_call_pump
+{
+public:
+	guest_call_pump(call_receiver* receiver);
+
+	void do_events();
+
+	virtual ~guest_call_pump() { }
+
+private:
+	uint32_t wait_for_request(uint8_t* data);
+	void nudge_host();
+
+private:
+	call_receiver* receiver;
+};
+
+#endif /* GUEST_CALL_PUMP_H */
