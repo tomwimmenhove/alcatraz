@@ -15,6 +15,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 #include <cstdint>
+#include "klib.h"
 
 extern "C"
 {
@@ -54,6 +55,8 @@ void __attribute__((noreturn)) __attribute__((section(".start"))) _start(void* d
 	/* Initialize globals and calls global constructors */
 	custom_preinit();
 	custom_init();
+
+	klib_init();
 
 	int exit_code = guest_main(data);
 

@@ -24,12 +24,26 @@
 #include <stdarg.h>
 
 extern "C" {
+	void __attribute__((noreturn)) panic(const char *format, ...);
 
-void __attribute__((noreturn)) panic(const char *format, ...);
+	void __attribute__((noreturn)) __assert_func(const char* file, int line,
+			const char* fn, const char* assertion);
+	void __attribute__((noreturn)) __assert_fail(const char * assertion,
+			const char * file, unsigned int line, const char * function);
+	intptr_t sbrk(ptrdiff_t heap_incr);
 
-void __attribute__((noreturn)) __assert_func(const char* file, int line, const char* fn, const char* assertion);
-void __attribute__((noreturn)) __assert_fail(const char * assertion, const char * file, unsigned int line, const char * function);
-intptr_t sbrk(ptrdiff_t heap_incr);
+	void __attribute__((noreturn)) _exit(int status);
+
+	int64_t write(int fd, const void *buf, size_t count);
+	int64_t read(int fd, void *buf, size_t count);
+	int close(int fd);
+
+	int kill(int pid, int sig);
+	int getpid(void);
+	int fstat(int fd, struct stat *statbuf);
+	int isatty(int fd);
+	int64_t lseek(int fd, int64_t offset, int whence);
+}
 
 void __attribute__((noreturn)) _exit(int status)
 {
@@ -43,18 +57,23 @@ void __attribute__((noreturn)) _exit(int status)
 int64_t write(int fd, const void *buf, size_t count) { return 0; }
 int64_t read(int fd, void *buf, size_t count) { return 0; }
 int close(int fd) { return 0; }
-#else
-int64_t write(int fd, const void *buf, size_t count);
-int64_t read(int fd, void *buf, size_t count);
-int close(int fd);
-#endif
+#endif /* DUMMY_IO */
 
 int kill(int pid, int sig) { return 0; }
 int getpid(void) { return 0; }
 int fstat(int fd, struct stat *statbuf) { return 0; }
-int isatty(int fd) { return 0; }
+int isatty(int fd) { return 1; }
 int64_t lseek(int fd, int64_t offset, int whence) { return 0; }
 
+void klib_init()
+{
+	stdin = fdopen(0, "r");
+	stdout = fdopen(1, "w+");
+	stderr = fdopen(2, "w+");
+
+	setvbuf(stdin,  nullptr, _IOLBF, 64);
+	setvbuf(stdout, nullptr, _IOLBF, 64);
+	setvbuf(stderr, nullptr, _IOLBF, 64);
 }
 
 void *operator new(size_t size)
@@ -126,9 +145,10 @@ void __attribute__((noreturn)) panic(const char *format, ...)
 	va_list args;
 	va_start(args, format);
 
-	vprintf(format, args);
-
+	vfprintf(stderr, format, args);
 	va_end(args);
+
+	fprintf(stderr, "\n");
 
 	exit(1);
 }
@@ -138,12 +158,14 @@ void __cxa_pure_virtual()
 	panic("Virtual method called");
 }
 
-void __attribute__((noreturn)) __assert_func(const char* file, int line, const char* fn, const char* assertion)
+void __attribute__((noreturn)) __assert_func(const char* file, int line,
+		const char* fn, const char* assertion)
 {
-	panic("%s: %d: %s: Assertion %s failed.\n", file, line, fn, assertion);
+	panic("%s: %d: %s: Assertion %s failed.", file, line, fn, assertion);
 }
 
-void __attribute__((noreturn)) __assert_fail(const char * assertion, const char * file, unsigned int line, const char * fn)
+void __attribute__((noreturn)) __assert_fail(const char * assertion,
+		const char * file, unsigned int line, const char * fn)
 {
-	__assert_func(file, line, fn, assertion);
+	panic("%s: %d: %s: Assertion %s failed.", file, line, fn, assertion);
 }
