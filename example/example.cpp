@@ -92,10 +92,13 @@ int main()
 	args.a = 42;
 	args.b = 43;
 
+	/* Setup a VCPU for the guest */
+	auto vcpu = box.setup_vcpu(args);
+
 	/* Start the guest in a separate thread */
 	int ret_value = 0;
 	std::thread box_thread([&](){
-			ret_value = box.run(args, &rt, &dispatcher);
+			ret_value = box.run(vcpu, &rt, &dispatcher);
 			});
 
 	/* Wait until the message pump is running on the guest */
